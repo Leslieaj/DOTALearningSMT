@@ -3,7 +3,7 @@
 import unittest
 from decimal import Decimal
 
-from interval import Interval
+from interval import Interval, intervals_partition, complement_intervals
 
 
 class IntervalTest(unittest.TestCase):
@@ -44,6 +44,33 @@ class IntervalTest(unittest.TestCase):
         for s1, s2, res in test_data:
             i1, i2 = Interval(s1), Interval(s2)
             self.assertEqual(i1.contains_interval(i2), res)
+
+    def testIntervalsPartition(self):
+        test_data = [
+            (["[1,2]", "(3,5)", "(4,6)"],
+             ["[0,1)", "[1,2]", "(2,3]", "(3,4]", "(4,5)", "[5,6)", "[6,+)"]),
+            (["(1,+)", "(2,3)", "(3,4)"],
+             ["[0,1]", "(1,2]", "(2,3)", "[3,3]", "(3,4)", "[4,+)"])
+        ]
+
+        for intervals, expected in test_data:
+            intervals = [Interval(s) for s in intervals]
+            expected = [Interval(s) for s in expected]
+            res = intervals_partition(intervals)
+            self.assertEqual(res, expected)
+
+    def testComplementIntervals(self):
+        test_data = [
+            (["[1,2]", "(3,5)", "(4,6)"], ["[0,1)", "(2,3]", "[6,+)"]),
+            (["(1,+)", "(2,3)", "(3,4)"], ["[0,1]"]),
+            (["(2,3]"], ["[0,2]", "(3,+)"]),
+        ]
+
+        for intervals, expected in test_data:
+            intervals = [Interval(s) for s in intervals]
+            expected = [Interval(s) for s in expected]
+            res = complement_intervals(intervals)
+            self.assertEqual(res, expected)
 
 
 if __name__ == "__main__":

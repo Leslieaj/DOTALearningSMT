@@ -3,7 +3,8 @@
 import unittest
 
 from interval import Interval
-from equivalence import Letter, Letterword
+from ota import buildOTA, buildAssistantOTA
+from equivalence import Letter, Letterword, init_letterword
 
 
 class EquivalenceTest(unittest.TestCase):
@@ -61,8 +62,19 @@ class EquivalenceTest(unittest.TestCase):
             seq = lw.delay_seq(4)
             self.assertEqual(len(seq), expected)
 
-    def testTransition(self):
-        pass
+    def testImmediateASucc(self):
+        ota_A = buildAssistantOTA(buildOTA('./examples/b.json'))
+        ota_B = buildAssistantOTA(buildOTA('./examples/c.json'))
+        lw = init_letterword(ota_A, ota_B)
+        lw = lw.delay_seq(5)[4]
+        lws = lw.immediate_asucc(ota_A, ota_B)
+        lws = [lw.lst for lw in lws]
+        expected = [
+            [{Letter('B','3','[0,0]'), Letter('A','3','[0,0]')}, {Letter('A','2','(2,3)')}],
+            [{Letter('A','3','[0,0]')}, {Letter('B','2','(2,3)'), Letter('A','2','(2,3)')}],
+            [{Letter('B','4','[0,0]'), Letter('A','4','[0,0]')}],
+        ]
+        self.assertEqual(lws, expected)
 
 
 if __name__ == "__main__":
