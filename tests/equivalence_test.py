@@ -61,6 +61,9 @@ class EquivalenceTest(unittest.TestCase):
             seq = lw.delay_seq(4)
             self.assertEqual(len(seq), expected)
 
+    def testTransition(self):
+        pass
+
 
 if __name__ == "__main__":
     unittest.main()

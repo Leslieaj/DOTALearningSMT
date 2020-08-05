@@ -61,13 +61,20 @@ class Letterword:
         return str(self.lst)
 
     def is_all_inf(self):
+        """Whether all letters in self have the infinite constraint."""
         for letter_set in self.lst:
             if not all(letter.constraint.is_inf_region() for letter in letter_set):
                 return False
         return True
 
     def delay_one(self, max_time_value):
-        """Delay for the minimal amount that changes the letterword."""
+        """Delay for the minimal amount that changes the letterword.
+        
+        If the first set has a point region (and so must correspond to an integer),
+        increment the first set. Otherwise, increment the last set to an integer
+        and rotate it into the first position.
+
+        """
         if any(fst.constraint.is_point_region() for fst in self.lst[0]):
             fst_set = set()
             for fst in self.lst[0]:
@@ -89,3 +96,12 @@ class Letterword:
             current_lw = next_lw
 
         return results
+
+    def transition(self, A_trans, B_tran):
+        """Perform the given set of transitions.
+
+        A_trans : set(OTATran), set of non-deterministic choices on the A side.
+        B_tran: OTATran, one transition on the B side.
+
+        """
+        pass

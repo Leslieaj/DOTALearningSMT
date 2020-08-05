@@ -71,6 +71,44 @@ class Interval:
         right = ']' if self.closed_max else ')'
         return left + str(self.min_value) + ',' + str(self.max_value) + right
 
+    def contains_point(self, t):
+        """Whether the given time is in the interval.
+
+        t : Decimal, input time.
+
+        """
+        if self.closed_min:
+            left_ok = (t >= self.min_value)
+        else:
+            left_ok = (t > self.min_value)
+        if self.max_value == '+':
+            right_ok = True
+        elif self.closed_max:
+            right_ok = (t <= self.max_value)
+        else:
+            right_ok = (t < self.max_value)
+        return left_ok and right_ok
+
+    def contains_interval(self, other):
+        """Whether the interval contains another interval.
+
+        other : Interval, input interval.
+
+        """
+        if self.closed_min or not other.closed_min:
+            left_ok = (other.min_value >= self.min_value)
+        else:
+            left_ok = (other.min_value > self.min_value)
+        if self.max_value == '+':
+            right_ok = True
+        elif other.max_value == '+':
+            right_ok = False
+        elif self.closed_max or not other.closed_max:
+            right_ok = (other.max_value <= self.max_value)
+        else:
+            right_ok = (other.max_value < self.max_value)
+        return left_ok and right_ok
+
     def is_point_region(self):
         """Whether the interval is of the form [t, t]."""
         return self.min_value == self.max_value and self.closed_min and self.closed_max
