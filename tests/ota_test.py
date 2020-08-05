@@ -1,7 +1,8 @@
 # Unit test for OTA
 
 import unittest
-
+import sys
+sys.path.append("./")
 from ota import buildOTA, buildAssistantOTA
 
 

@@ -2,7 +2,8 @@
 
 import unittest
 from decimal import Decimal
-
+import sys
+sys.path.append("./")
 from interval import Interval, intervals_partition, complement_intervals
 
 
@@ -50,7 +51,9 @@ class IntervalTest(unittest.TestCase):
             (["[1,2]", "(3,5)", "(4,6)"],
              ["[0,1)", "[1,2]", "(2,3]", "(3,4]", "(4,5)", "[5,6)", "[6,+)"]),
             (["(1,+)", "(2,3)", "(3,4)"],
-             ["[0,1]", "(1,2]", "(2,3)", "[3,3]", "(3,4)", "[4,+)"])
+             ["[0,1]", "(1,2]", "(2,3)", "[3,3]", "(3,4)", "[4,+)"]),
+            (["(3,7)", "(5,9]", "(10,12)"],
+             ["[0,3]", "(3,5]", "(5,7)", "[7,9]", "(9,10]", "(10,12)", "[12,+)"]),
         ]
 
         for intervals, expected in test_data:

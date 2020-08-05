@@ -1,7 +1,8 @@
 # Unit test for equivalence.py
 
 import unittest
-
+import sys
+sys.path.append("./")
 from interval import Interval
 from ota import buildOTA, buildAssistantOTA
 from equivalence import Letter, Letterword, init_letterword
