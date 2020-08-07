@@ -40,6 +40,9 @@ class TimedWord:
     def __str__(self):
         return '(%s,%s)' % (self.action, str(self.time))
 
+    def __repr__(self):
+        return str(self)
+
 
 class OTATran:
     """Represents a transition in timed automata."""
