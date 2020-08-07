@@ -85,19 +85,19 @@ class EquivalenceTest(unittest.TestCase):
         for lw1, lw2, expected in test_data:
             self.assertEqual(lw1.can_dominate(lw2), expected)
 
-    def testImmediateASucc(self):
-        ota_A = buildAssistantOTA(buildOTA('./examples/b.json'))
-        ota_B = buildAssistantOTA(buildOTA('./examples/c.json'))
-        lw = init_letterword(ota_A, ota_B)
-        lw = lw.delay_seq(5)[4]
-        lws = lw.immediate_asucc(ota_A, ota_B)
-        lws = [lw.lst for lw in lws]
-        expected = [
-            [{Letter('B','3','[0,0]'), Letter('A','3','[0,0]')}, {Letter('A','2','(2,3)')}],
-            [{Letter('A','3','[0,0]')}, {Letter('B','2','(2,3)'), Letter('A','2','(2,3)')}],
-            [{Letter('B','4','[0,0]'), Letter('A','4','[0,0]')}],
-        ]
-        self.assertEqual(lws, expected)
+    # def testImmediateASucc(self):
+    #     ota_A = buildAssistantOTA(buildOTA('./examples/b.json'))
+    #     ota_B = buildAssistantOTA(buildOTA('./examples/c.json'))
+    #     lw = init_letterword(ota_A, ota_B)
+    #     lw = lw.delay_seq(5)[4]
+    #     lws = lw.immediate_asucc(ota_A, ota_B)
+    #     lws = [lw.lst for lw in lws]
+    #     expected = [
+    #         [{Letter('B','3','[0,0]'), Letter('A','3','[0,0]')}, {Letter('A','2','(2,3)')}],
+    #         [{Letter('A','3','[0,0]')}, {Letter('B','2','(2,3)'), Letter('A','2','(2,3)')}],
+    #         [{Letter('B','4','[0,0]'), Letter('A','4','[0,0]')}],
+    #     ]
+    #     self.assertEqual(lws, expected)
 
     def testInclusion(self):
         ota_A = buildAssistantOTA(buildOTA('./examples/b.json'))
@@ -106,6 +106,13 @@ class EquivalenceTest(unittest.TestCase):
         print(res)
         print(ctx)
 
+        ota_A = buildAssistantOTA(buildOTA('./examples/c.json'))
+        ota_B = buildAssistantOTA(buildOTA('./examples/b.json'))
+        res, ctx = ota_inclusion(5, ota_A, ota_B)
+        print(res)
+        print(ctx)
+        print(ctx.pre_lw)
+        print(ctx.pre_lw.pre_lw)
 
 if __name__ == "__main__":
     unittest.main()
