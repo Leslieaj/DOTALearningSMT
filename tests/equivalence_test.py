@@ -5,7 +5,7 @@ import sys
 sys.path.append("./")
 from interval import Interval
 from ota import buildOTA, buildAssistantOTA
-from equivalence import Letter, Letterword, init_letterword
+from equivalence import Letter, Letterword, init_letterword, ota_inclusion
 
 
 class EquivalenceTest(unittest.TestCase):
@@ -63,6 +63,28 @@ class EquivalenceTest(unittest.TestCase):
             seq = lw.delay_seq(4)
             self.assertEqual(len(seq), expected)
 
+    def testCanDominate(self):
+        test_data = [
+            (Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)')}]),
+             Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)')}]),
+             True),
+            (Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)')}]),
+             Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(1,2)')}]),
+             False),
+            (Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)')}]),
+             Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)'), Letter('B', 'q1', '(1,2)')}]),
+             True),
+            (Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)'), Letter('B', 'q1', '(1,2)')}]),
+             Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)')}]),
+             False),
+            (Letterword([{Letter('B', 'q1', '(0,1)')}]),
+             Letterword([{Letter('A', 's1', '[0,0]')}, {Letter('B', 'q1', '(0,1)'), Letter('B', 'q1', '(1,2)')}]),
+             True),
+        ]
+
+        for lw1, lw2, expected in test_data:
+            self.assertEqual(lw1.can_dominate(lw2), expected)
+
     def testImmediateASucc(self):
         ota_A = buildAssistantOTA(buildOTA('./examples/b.json'))
         ota_B = buildAssistantOTA(buildOTA('./examples/c.json'))
@@ -76,6 +98,13 @@ class EquivalenceTest(unittest.TestCase):
             [{Letter('B','4','[0,0]'), Letter('A','4','[0,0]')}],
         ]
         self.assertEqual(lws, expected)
+
+    def testInclusion(self):
+        ota_A = buildAssistantOTA(buildOTA('./examples/b.json'))
+        ota_B = buildAssistantOTA(buildOTA('./examples/c.json'))
+        res, ctx = ota_inclusion(5, ota_A, ota_B)
+        print(res)
+        print(ctx)
 
 
 if __name__ == "__main__":

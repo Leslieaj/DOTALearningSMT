@@ -99,6 +99,35 @@ class Letterword:
 
         return results
 
+    def can_dominate(self, lw2):
+        """Determine whether self can dominate lw2 (lw2 <= self)."""
+        id_self = 0
+        id2 = 0
+        for letter_set in self.lst:
+            for i in range(id2, len(lw2.lst)):
+                if letter_set.issubset(lw2.lst[i]):
+                    id2 = i + 1
+                    id_self += 1
+                    break
+        return id_self == len(self.lst)
+
+    def is_bad(self, ota_A, ota_B):
+        """Determine whether the letterword is bad. That is the B-side is
+        accepting, but none of the A-side is accepting.
+
+        """
+        A_accept, B_accept = False, False
+        for letter_set in self.lst:
+            for letter in letter_set:
+                if letter.side == 'A':
+                    if letter.location in ota_A.accept_states:
+                        A_accept = True
+                if letter.side == 'B':
+                    if letter.location in ota_B.accept_states:
+                        B_accept = True
+
+        return B_accept and not A_accept
+
     def immediate_asucc(self, ota_A, ota_B):
         """Perform an immediate action, without further time delays.
 
@@ -186,7 +215,54 @@ class Letterword:
 
         return all_res
 
+    def compute_wsucc(self, max_time_value, ota_A, ota_B):
+        delay_seq = self.delay_seq(max_time_value)
+        results = []
+        for delay in delay_seq:
+            results.extend(delay.immediate_asucc(ota_A, ota_B))
+        return results
 
 def init_letterword(ota_A, ota_B):
+    """Returns the initial letterword for determining inclusion L(B) <= L(A)."""
     return Letterword([{Letter('A', ota_A.init_state, point_region(0)),
                         Letter('B', ota_B.init_state, point_region(0))}])
+
+def explored_dominated(explored, w):
+    for v in explored:
+        if v.can_dominate(w):
+            return True
+    return False
+
+def ota_inclusion(max_time_value, ota_A, ota_B):
+    """Determines the inclusion L(B) <= L(A).
+    
+    Returns True, None if L(B) <= L(A). Otherwise, returns False, ctx,
+    where ctx is a timed word accepted by B but not by A.
+
+    """
+    w0 = init_letterword(ota_A, ota_B)
+    to_explore = [w0]
+    explored = []
+    while True:
+        if len(to_explore) == 0:
+            return True, None
+
+        w = to_explore[0]
+        del to_explore[0]
+        if w.is_bad(ota_A, ota_B):
+            return False, w  # return counterexample
+
+        while explored_dominated(explored, w):
+            if len(to_explore) == 0:
+                return True, None
+            w = to_explore[0]
+            del to_explore[0]
+            if w.is_bad(ota_A, ota_B):
+                return False, w
+
+        wsucc = w.compute_wsucc(max_time_value, ota_A, ota_B)
+        for nw in wsucc:
+            if nw not in to_explore:
+                to_explore.append(nw)
+        if w not in explored:
+            explored.append(w)
