@@ -34,6 +34,12 @@ class TimedWord:
     def __eq__(self, other):
         return self.action == other.action and self.time == other.time
 
+    def __le__(self, other):
+        return (self.action, self.time) <= (other.action, other.time)
+
+    def __lt__(self, other):
+        return (self.action, self.time) < (other.action, other.time)
+
     def __hash__(self):
         return hash(('TIMEDWORD', self.action, self.time))
 
@@ -62,6 +68,12 @@ class OTATran:
         self.constraint = constraint
         self.reset = reset
         self.target = target
+
+    def __str__(self):
+        return '%s %s %s %s %s' % (self.source, self.action, self.target, self.constraint, self.reset)
+
+    def __repr__(self):
+        return str(self)
 
     def is_pass(self, source, action, time):
         """Whether the given action and time is allowed by the transition.
