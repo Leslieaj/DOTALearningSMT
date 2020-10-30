@@ -63,13 +63,16 @@ class OTATran:
         self.reset = reset
         self.target = target
 
-    def is_pass(self, tw):
-        """Whether tw is allowed by the transition.
+    def is_pass(self, source, action, time):
+        """Whether the given action and time is allowed by the transition.
 
-        tw : TimedWord, input timed word.
+        source : str, source of the action.
+        action : str, name of the action.
+        time : Decimal, time at which the action should occur.
 
         """
-        return tw.action == self.action and self.constraint.contains_point(tw.time)
+        return source == self.source and action == self.action and \
+            self.constraint.contains_point(time)
 
 
 class OTA:
@@ -114,6 +117,39 @@ class OTA:
         res += "sink states:\n"
         res += str(self.sink_name) + "\n"
         return res
+
+    def runTimedWord(self, tws):
+        """Execute the given timed words.
+        
+        tws : list(TimedWord)
+
+        Returns whether the timed word is accepted (1), rejected (0), or goes
+        to sink (-1).
+
+        TODO: we currently only implement the deterministic case.
+
+        """
+        cur_state, cur_time = self.init_state, 0
+        for tw in tws:
+            moved = False
+            for tran in self.trans:
+                if tran.is_pass(cur_state, tw.action, cur_time + tw.time):
+                    cur_state = tran.target
+                    if tran.reset:
+                        cur_time = 0
+                    else:
+                        cur_time += tw.time
+                    moved = True
+                    break
+            if not moved:
+                return -1  # assume to go to sink
+
+        if self.sink_name is not None and cur_state == self.sink_name:
+            return -1
+        elif cur_state in self.accept_states:
+            return 1
+        else:
+            return 0
 
 
 def buildOTA(jsonfile):
