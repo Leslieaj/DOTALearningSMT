@@ -2,7 +2,7 @@
 
 import unittest
 
-from learner import TestSequence
+from learner import TestSequence, Learner
 from ota import TimedWord, buildOTA, buildAssistantOTA
 
 
@@ -21,6 +21,29 @@ class LearnerTest(unittest.TestCase):
                   (TimedWord('a', 2), TimedWord('b', 1), TimedWord('b', 1)): False}
         self.assertEqual(ts.getTimeVals(reset1), 1)
         self.assertEqual(ts.getTimeVals(reset2), 4)
+
+    def testLearner(self):
+        ota = buildOTA('./examples/a.json')
+        learner = Learner(ota)
+        S_list = [
+            (),
+            (TimedWord('a', 1),),
+            (TimedWord('a', 1), TimedWord('b', 1)),
+        ]
+        R_list = [
+            (TimedWord('a', 1), TimedWord('b', 1), TimedWord('a', 1)),
+        ]
+        for S in S_list:
+            learner.S[S] = TestSequence(S)
+        for R in R_list:
+            learner.R[R] = TestSequence(R)
+        learner.E = [(TimedWord('a', 0),), (TimedWord('b', 0),),
+                     (TimedWord('a', 1),), (TimedWord('b', 1),),
+                     (TimedWord('a', 2),), (TimedWord('b', 2),)]
+
+        resets, foundR = learner.findReset()
+        print(resets)
+        print(foundR)
 
 
 if __name__ == "__main__":
