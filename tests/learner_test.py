@@ -48,7 +48,7 @@ class LearnerTest(unittest.TestCase):
         # print(candidateOTA)
 
     def testLearn(self):
-        ota = buildOTA('./examples/a.json')
+        ota = buildOTA('./examples/b.json')
         learn_ota(ota)
 
 

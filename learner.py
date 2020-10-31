@@ -88,6 +88,9 @@ class Learner:
         res += 'R:\n'
         for twR, info in self.R.items():
             res += str(twR) + ': ' + str(info) + '\n'
+        res += 'E:\n'
+        for twE in self.E:
+            res += str(twE)
         return res
 
     def addToS(self, tws):
@@ -114,11 +117,11 @@ class Learner:
         for i in range(len(tws)+1):
             cur_tws = tws[:i]
 
+            cur_res = self.ota.runTimedWord(cur_tws)
             if cur_tws not in self.S and cur_tws not in self.R:
-                cur_res = self.ota.runTimedWord(cur_tws)
                 self.R[cur_tws] = TestSequence(cur_tws, cur_res)
-                if cur_res == -1:  # stop when already reached sink
-                    break
+            if cur_res == -1:  # stop when already reached sink
+                break
         
     def findReset(self):
         non_sink_R = dict((twR, infoR) for twR, infoR in self.R.items()
