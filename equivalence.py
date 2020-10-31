@@ -196,7 +196,7 @@ class Letterword:
                 new_lst.append(set(reset_list))
                 new_frac_times.append(Decimal(0))
                 if has_point_region:
-                    new_lst[0].union(noreset_list[0])
+                    new_lst[0] = new_lst[0].union(noreset_list[0])
                 elif noreset_list[0]:
                     new_lst.append(set(noreset_list[0]))
                     new_frac_times.append(self.frac_times[0])
@@ -266,7 +266,10 @@ class Letterword:
         delay_seq = self.delay_seq(max_time_value)
         results = []
         for delay in delay_seq:
-            results.extend(delay.immediate_asucc(ota_A, ota_B))
+            imm_asucc = delay.immediate_asucc(ota_A, ota_B)
+            for asucc in imm_asucc:
+                if asucc not in results:
+                    results.append(asucc)
         return results
 
     def find_path(self, ota_A, ota_B):

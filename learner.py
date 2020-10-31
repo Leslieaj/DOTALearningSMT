@@ -1,6 +1,6 @@
 # Data structure for the learner.
 
-from ota import TimedWord, OTA, OTATran
+from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA
 from interval import Interval
 from equivalence import ota_equivalent
 
@@ -15,6 +15,12 @@ class TestSequence:
         self.is_accept = (res == 1)
         self.is_sink = (res == -1)
         self.info = dict()
+
+    def __str__(self):
+        return "Accept: %s, Sink: %s, Info: %s" % (self.is_accept, self.is_sink, self.info)
+
+    def __repr__(self):
+        return str(self)
 
     def testSuffix(self, ota, tws2, shift=0):
         """Test the given timed words starting from self.
@@ -149,13 +155,18 @@ class Learner:
     def buildCandidateOTA(self):
         """Construct candidate OTA from current information."""
         resets, foundR = self.findReset()
+        # print(self.S)
+        # print(self.R)
 
+        # Mapping from timed words to location names.
         # Each path in S should correspond to a location.
         locations = dict()
         for i, twS in enumerate(sorted(self.S)):
             locations[twS] = str(i+1)
+        locations['sink'] = str(len(self.S)+1)
         
-        # For each location and action, we find the list of transitions.
+        # Mapping from location and action to a list of transitions,
+        # in the form of triples (time, reset, target).
         transitions = dict()
         for i in range(len(self.S)):
             name = str(i+1)
@@ -166,7 +177,7 @@ class Learner:
         # List of accept states
         accepts = []
         for twS in locations:
-            if self.ota.runTimedWord(twS) == 1:
+            if twS != 'sink' and self.S[twS].is_accept:
                 accepts.append(locations[twS])
         
         # Fill in transitions using prefix in S.
@@ -182,7 +193,7 @@ class Learner:
             prev_loc = locations[twR[:-1]]
             start_time = self.S[twR[:-1]].getTimeVals(resets)
             if self.R[twR].is_sink:
-                transitions[prev_loc][twR[-1].action].append((start_time + twR[-1].time, False, None))
+                transitions[prev_loc][twR[-1].action].append((start_time + twR[-1].time, True, locations['sink']))
             else:
                 cur_loc = locations[foundR[twR]]
                 transitions[prev_loc][twR[-1].action].append((start_time + twR[-1].time, resets[twR], cur_loc))
@@ -212,13 +223,20 @@ class Learner:
                         constraint = Interval(min_value, closed_min, '+', False)
                     otaTrans.append(OTATran(source, action, constraint, reset, target))
 
+        location_objs = []
+        for tw, loc in locations.items():
+            if tw == 'sink':
+                location_objs.append(Location(loc, False, False, True))
+            else:
+                location_objs.append(Location(loc, (tw == ()), self.S[tw].is_accept, self.S[tw].is_sink))
         candidateOTA = OTA(
             name=self.ota.name + '_',
             sigma=self.actions,
-            locations=[loc for _, loc in locations.items()],
+            locations=location_objs,
             trans=otaTrans,
             init_state='1',
-            accept_states=accepts)
+            accept_states=accepts,
+            sink_name=locations['sink'])
 
         return candidateOTA
 
@@ -226,10 +244,15 @@ class Learner:
 def learn_ota(ota):
     """Overall learning loop."""
     learner = Learner(ota)
+    assist_ota = buildAssistantOTA(ota)
     for i in range(5):
         candidate = learner.buildCandidateOTA()
         print(candidate)
-        res, ctx = ota_equivalent(4, ota, candidate)
-        ctx_path = ctx.find_path(ota, candidate)
+        res, ctx = ota_equivalent(4, assist_ota, candidate)
+        if res:
+            print('Finished')
+            break
+        # print(res, ctx)
+        ctx_path = ctx.find_path(assist_ota, candidate)
         print('Counterexample', ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)

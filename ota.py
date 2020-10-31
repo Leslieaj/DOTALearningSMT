@@ -90,7 +90,7 @@ class OTATran:
 class OTA:
     """Represents a nondeterministic one-clock timed automata."""
 
-    def __init__(self, name, sigma, locations, trans, init_state, accept_states):
+    def __init__(self, name, sigma, locations, trans, init_state, accept_states, sink_name=None):
         """The initial data are:
 
         name : str, name of the automata.
@@ -107,7 +107,7 @@ class OTA:
         self.trans = trans
         self.init_state = init_state
         self.accept_states = accept_states
-        self.sink_name = None
+        self.sink_name = sink_name
 
     def __str__(self):
         res = ""
@@ -238,6 +238,6 @@ def buildAssistantOTA(ota):
         for label in ota.sigma:
             assist_trans.append(OTATran(sink.name, label, Interval("[0,+)"), True, sink.name))
 
-    assist_ota = OTA(assist_name, ota.sigma, assist_locations, assist_trans, assist_init, assist_accepts)
-    assist_ota.sink_name = sink.name
+    assist_ota = OTA(assist_name, ota.sigma, assist_locations, assist_trans, assist_init, assist_accepts,
+                     sink_name=sink.name)
     return assist_ota

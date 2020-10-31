@@ -6,8 +6,8 @@ sys.path.append("./")
 from decimal import Decimal
 
 from interval import Interval
-from ota import buildOTA, buildAssistantOTA
-from equivalence import round_div_2, Letter, Letterword, init_letterword, ota_inclusion
+from ota import buildOTA, buildAssistantOTA, TimedWord
+from equivalence import round_div_2, Letter, Letterword, init_letterword, ota_inclusion, ota_equivalent
 
 
 class EquivalenceTest(unittest.TestCase):
@@ -117,16 +117,20 @@ class EquivalenceTest(unittest.TestCase):
         ota_A = buildAssistantOTA(buildOTA('./examples/b.json'))
         ota_B = buildAssistantOTA(buildOTA('./examples/c.json'))
         res, ctx = ota_inclusion(5, ota_A, ota_B)
-        print(res)
-        if not res:
-            print(ctx.find_path(ota_A, ota_B))
+        self.assertTrue(res)
 
         ota_A = buildAssistantOTA(buildOTA('./examples/c.json'))
         ota_B = buildAssistantOTA(buildOTA('./examples/b.json'))
         res, ctx = ota_inclusion(5, ota_A, ota_B)
-        print(res)
-        if not res:
-            print(ctx.find_path(ota_A, ota_B))
+        self.assertFalse(res)
+        self.assertEqual(ctx.find_path(ota_A, ota_B), [TimedWord('a', 2.5)])
+
+    def testEquivalence1(self):
+        ota_empty = buildAssistantOTA(buildOTA('./examples/empty.json'))
+        ota_A = buildAssistantOTA(buildOTA('./examples/a.json'))
+        res, ctx = ota_equivalent(4, ota_empty, ota_A)
+        self.assertFalse(res)
+        self.assertEqual(ctx.find_path(ota_empty, ota_A), [TimedWord('a', 1.0), TimedWord('b', 1.0)])
 
 
 if __name__ == "__main__":

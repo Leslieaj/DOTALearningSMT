@@ -1,0 +1,9 @@
+{
+    "name": "empty",
+    "l": ["1"],
+	"sigma": ["a", "b"],
+	"tran": {
+	},
+	"init": "1",
+	"accept": []
+}
