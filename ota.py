@@ -121,7 +121,8 @@ class OTA:
             res += str(l) + "\n"
         res += "transitions (id, source_state, label, target_state, constraints, reset):\n"
         for t in self.trans:
-            res += "%s %s %s %s %s\n" % (t.source, t.action, t.target, t.constraint, t.reset)
+            if t.target != self.sink_name:
+                res += "%s %s %s %s %s\n" % (t.source, t.action, t.target, t.constraint, t.reset)
         res += "init state:\n"
         res += str(self.init_state) + "\n"
         res += "accept states:\n"
