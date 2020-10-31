@@ -78,6 +78,8 @@ class Learner:
         self.R = dict()  # Test sequences
         self.E = []  # Discriminator sequences
 
+        self.forbidResets = []  # list of forbidden reset patterns
+
         self.addPath(())
         self.addToS(())
 
@@ -123,6 +125,17 @@ class Learner:
             if cur_res == -1:  # stop when already reached sink
                 break
         
+    def isResetForbidden(self, reset):
+        for forbidReset in self.forbidResets:
+            agree = True
+            for tw in forbidReset:
+                if forbidReset[tw] != reset[tw]:
+                    agree = False
+                    break
+            if agree:
+                return True
+        return False
+
     def findReset(self):
         non_sink_R = dict((twR, infoR) for twR, infoR in self.R.items()
                           if not infoR.is_sink)
@@ -141,6 +154,9 @@ class Learner:
                     resets[twS] = False if guesses[i-1] == '0' else True
             for i, twR in enumerate(sorted(non_sink_R)):
                 resets[twR] = False if guesses[i+len(self.S)-1] == '0' else True
+
+            if self.isResetForbidden(resets):
+                continue
 
             foundR = dict()
             for twS in self.S:
@@ -225,6 +241,8 @@ class Learner:
                         assert newE is not None
                         newE = (TimedWord(tw1[-1].action, min(tw1[-1].time, tw2[-1].time)),) + newE
                         return newE
+                    if int(tw1[-1].time + time_val1) == int(tw2[-1].time + time_val2):
+                        return 'contradiction'
 
         return None
 
@@ -292,7 +310,7 @@ class Learner:
         for source in transitions:
             for action, trans in transitions[source].items():
                 trans = sorted(trans)
-
+                # print('trans', source, action, trans)
                 # Remove duplicates
                 trans_new = [trans[0]]
                 for i in range(1, len(trans)):
@@ -342,7 +360,7 @@ def learn_ota(ota):
     """Overall learning loop."""
     learner = Learner(ota)
     assist_ota = buildAssistantOTA(ota)
-    for i in range(10):
+    for i in range(20):
         while True:
             resets, foundR = learner.findReset()
             print(learner)
@@ -358,10 +376,12 @@ def learn_ota(ota):
                 assert hasAddToS
             else:
                 newE = learner.checkConsistent(resets, foundR)
-                if newE is None:
-                    break
-                else:
+                if newE == 'contradiction':
+                    learner.forbidResets.append(resets)
+                elif newE is not None:
                     learner.E.append(newE)
+                else:
+                    break
 
         candidate = learner.buildCandidateOTA(resets, foundR)
         print(candidate)
