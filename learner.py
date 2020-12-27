@@ -1,5 +1,7 @@
 # Data structure for the learner.
 
+import pprint
+
 from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA
 from interval import Interval
 from equivalence import ota_equivalent
@@ -313,14 +315,14 @@ class Learner:
             locations[twS] = str(i+1)
         locations['sink'] = str(len(self.S)+1)
         
-        # Mapping from location and action to a list of transitions,
-        # in the form of triples (time, reset, target).
+        # Mapping from location, action and time to transitions,
+        # in the form of (reset, target).
         transitions = dict()
         for i in range(len(self.S)+1):
             name = str(i+1)
             transitions[name] = dict()
             for act in self.actions:
-                transitions[name][act] = []
+                transitions[name][act] = dict()
 
         # List of accept states
         accepts = []
@@ -328,18 +330,22 @@ class Learner:
             if twS != 'sink' and self.S[twS].is_accept:
                 accepts.append(locations[twS])
         
-        # Fill in transitions using prefix in S.
+        # Fill in transitions using prefix in S. For each nonempty entry
+        # in S, find its immediate predecessor.
         for twS in sorted(self.S):
-            if twS != ():
-                cur_loc = locations[twS]
-                if twS[:-1] in locations:
-                    prev_loc = locations[twS[:-1]]
-                    start_time = self.S[twS[:-1]].getTimeVal(resets)
-                else:
-                    prev_loc = locations[foundR[twS[:-1]]]
-                    start_time = self.R[twS[:-1]].getTimeVal(resets)
-                transitions[prev_loc][twS[-1].action].append((start_time + twS[-1].time, resets[twS], cur_loc))
-        
+            if twS == ():
+                continue
+
+            cur_loc = locations[twS]
+            assert twS[:-1] in locations, 'S is not prefix closed'
+            prev_loc = locations[twS[:-1]]
+            start_time = self.S[twS[:-1]].getTimeVal(resets)
+            trans_time = start_time + twS[-1].time
+            if trans_time in transitions[prev_loc][twS[-1].action] and \
+                (resets[twS], cur_loc) != transitions[prev_loc][twS[-1].action][trans_time]:
+                raise AssertionError('Conflict at %s %s %s' % (prev_loc, twS[-1].action, trans_time))
+            transitions[prev_loc][twS[-1].action][trans_time] = (resets[twS], cur_loc)
+ 
         # Fill in transitions using R.
         for twR in self.R:
             if twR[:-1] in locations:
@@ -348,32 +354,38 @@ class Learner:
             else:
                 prev_loc = locations[foundR[twR[:-1]]]
                 start_time = self.R[twR[:-1]].getTimeVal(resets)
+            
+            trans_time = start_time + twR[-1].time
             if self.R[twR].is_sink:
-                transitions[prev_loc][twR[-1].action].append((start_time + twR[-1].time, True, locations['sink']))
+                cur_reset, cur_loc = True, locations['sink']
             else:
-                cur_loc = locations[foundR[twR]]
-                transitions[prev_loc][twR[-1].action].append((start_time + twR[-1].time, resets[twR], cur_loc))
+                cur_reset, cur_loc = resets[twR], locations[foundR[twR]]
 
+            if trans_time in transitions[prev_loc][twR[-1].action] and \
+                (cur_reset, cur_loc) != transitions[prev_loc][twR[-1].action][trans_time]:
+                raise AssertionError('Conflict at %s (%s, %s)' % (prev_loc, twS[-1].action, trans_time))
+            transitions[prev_loc][twR[-1].action][trans_time] = cur_reset, cur_loc
+
+        # pprint.PrettyPrinter().pprint(transitions)
         # Sink transitions
         for act in self.actions:
-            transitions[locations['sink']][act].append((0, True, locations['sink']))
+            transitions[locations['sink']][act][0] = (True, locations['sink'])
 
-        # print('locations', locations)
+        # From the dictionary of transitions, form the list otaTrans.
         otaTrans = []
         for source in transitions:
             for action, trans in transitions[source].items():
-                trans = sorted(trans)
-                # print('trans', source, action, trans)
-                # Remove duplicates
+                # Sort and remove duplicates
+                trans = sorted((time, reset, target) for time, (reset, target) in trans.items())
                 trans_new = [trans[0]]
                 for i in range(1, len(trans)):
                     time, reset, target = trans[i]
-                    ptime, preset, ptarget = trans[i-1]
-                    if reset != preset or target != ptarget:
+                    prev_time, prev_reset, prev_target = trans[i-1]
+                    if reset != prev_reset or target != prev_target:
                         trans_new.append(trans[i])
                 trans = trans_new
 
-                # print('transitions:', source, action, trans)
+                # Change to otaTrans.
                 for i in range(len(trans)):
                     time, reset, target = trans[i]                            
                     if int(time) == time:
@@ -391,12 +403,14 @@ class Learner:
                         constraint = Interval(min_value, closed_min, '+', False)
                     otaTrans.append(OTATran(source, action, constraint, reset, target))
 
+        # Form the Location objects.
         location_objs = []
         for tw, loc in locations.items():
             if tw == 'sink':
                 location_objs.append(Location(loc, False, False, True))
             else:
                 location_objs.append(Location(loc, (tw == ()), self.S[tw].is_accept, self.S[tw].is_sink))
+
         candidateOTA = OTA(
             name=self.ota.name + '_',
             sigma=self.actions,
@@ -420,10 +434,14 @@ def learn_ota(ota):
             if resets is None:
                 # No possible choice of resets with the current S.
                 hasAddToS = False
-                for twR in foundR:
-                    if foundR[twR] is None:
-                        print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR)))
-                        learner.addToS(twR)
+                for twR, v in sorted(foundR.items()):
+                    if v is None:
+                        # Add the shortest prefix of twR not currently in S.
+                        for i in range(len(twR)+1):
+                            if twR[:i] not in learner.S:
+                                print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR[:i])))
+                                learner.addToS(twR[:i])
+                                break
                         hasAddToS = True
                         break
                 assert hasAddToS
@@ -436,7 +454,7 @@ def learn_ota(ota):
                 for tws, target in foundR.items():
                     if tws != target and target != 'sink':
                         print('  %s -> %s' % (','.join(str(tw) for tw in tws),
-                                              ','.join(str(tw) for tw in target)))
+                                              ','.join(str(tw) for tw in target) if target else '()'))
                 print()
                 newE = learner.checkConsistent(resets, foundR)
                 if newE == 'contradiction':
@@ -450,7 +468,7 @@ def learn_ota(ota):
         print(candidate)
         res, ctx = ota_equivalent(10, assist_ota, candidate)
         if res:
-            print('Finished')
+            print('Finished in %s steps' % i)
             break
         # print(res, ctx)
         ctx_path = ctx.find_path(assist_ota, candidate)
