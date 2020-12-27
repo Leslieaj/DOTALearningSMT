@@ -6,10 +6,16 @@ from equivalence import ota_equivalent
 
 
 class TestSequence:
-    """Represents data for a single test sequence.
-
-    """
+    """Represents data for a single test sequence."""
     def __init__(self, tws, res):
+        """Initialize data for a test sequence.
+
+        tws - list(TimedWord)
+        res - 1, 0, or -1, indicating accept, non-accept, and sink.
+
+        Keeps a dictionary mapping suffixes to test results.
+
+        """
         self.tws = tuple(tws)
 
         self.is_accept = (res == 1)
@@ -18,11 +24,14 @@ class TestSequence:
 
     def __str__(self):
         if self.is_accept:
-            return "Accept, Info: %s" % self.info
+            res = "Accept\n"
         elif self.is_sink:
-            return "Sink, Info: %s" % self.info
+            res = "Sink\n"
         else:
-            return "Non-accept, Info: %s" % self.info
+            res = "Non-accept\n"
+        for tws, val in sorted(self.info.items()):
+            res += '  %s: %s\n' % (','.join(str(tw) for tw in tws), val)
+        return res
 
     def __repr__(self):
         return str(self)
@@ -44,9 +53,10 @@ class TestSequence:
         return self.info[tws2]
 
     def allTimeVals(self):
-        """Returns the set of possible time values at the end.
+        """Return the set of possible values of the clock at the end of tws.
 
-        This considers all possible values of resets.
+        This considers all possible values of resets. Starting from
+        the end, find all possible sums of suffixes.
 
         """
         vals = {0}
@@ -57,8 +67,13 @@ class TestSequence:
                 vals.add(cur_time)
         return vals
 
-    def getTimeVals(self, resets):
-        """Given a choice of resets, find the value of time at the end."""
+    def getTimeVal(self, resets):
+        """Given a choice of resets, find the value of time at the end.
+        
+        resets - dict(TimedWord, bool).
+        Mapping from timed words to whether guessing a reset at its end.
+
+        """
         cur_time = 0
         for i, tw in reversed(list(enumerate(self.tws))):
             if resets[self.tws[:i+1]]:
@@ -74,25 +89,28 @@ class Learner:
         self.ota = ota
         self.actions = ota.sigma
 
+        # S and R are test sequences that are internal and at the boundary.
         self.S = dict()
-        self.R = dict()  # Test sequences
-        self.E = []  # Discriminator sequences
+        self.R = dict()
 
-        self.forbidResets = []  # list of forbidden reset patterns
+        # List of discriminator sequences
+        self.E = []
+
+        # list of forbidden reset patterns
+        self.forbidResets = []
 
         self.addPath(())
         self.addToS(())
 
     def __str__(self):
         res = 'S:\n'
-        for twS, info in self.S.items():
-            res += str(twS) + ': ' + str(info) + '\n'
+        for twS, info in sorted(self.S.items()):
+            res += str(twS) + ': ' + str(info)
         res += 'R:\n'
-        for twR, info in self.R.items():
-            res += str(twR) + ': ' + str(info) + '\n'
+        for twR, info in sorted(self.R.items()):
+            res += str(twR) + ': ' + str(info)
         res += 'E:\n'
-        for twE in self.E:
-            res += str(twE)
+        res += '\n'.join(','.join(str(tw) for tw in twE) for twE in self.E)
         return res
 
     def addToS(self, tws):
@@ -114,7 +132,12 @@ class Learner:
                     self.R[cur_tws] = TestSequence(cur_tws, cur_res)
 
     def addPath(self, tws):
-        """Add the given path tws (and all its prefixes) to R."""
+        """Add the given path tws (and its prefixes) to R.
+        
+        Starting from the head, it keeps adding longer prefixes until reaching
+        the sink.
+
+        """
         tws = tuple(tws)
         for i in range(len(tws)+1):
             cur_tws = tws[:i]
@@ -137,6 +160,18 @@ class Learner:
         return False
 
     def findReset(self):
+        """Find a valid setting of resets.
+        
+        Returns a tuple (resets, foundR). If success, then resets is a
+        dictionary mapping from nonempty keys in S and R to booleans, and
+        foundR is a mapping from keys in S and R to keys in S (or the sink)
+        that can correspond to the same location.
+
+        If fails, then resets is None.
+
+        """
+        # Take a guess for each nonempty key in S and each key in R that
+        # is not a sink.
         non_sink_R = dict((twR, infoR) for twR, infoR in self.R.items()
                           if not infoR.is_sink)
         num_guess = len(self.S) + len(non_sink_R) - 1
@@ -146,8 +181,12 @@ class Learner:
         for twR in non_sink_R:
             foundR_all[twR] = None
 
+        # Iterate over the guesses.
         for num in range(2 ** num_guess):
+            # List of booleans corresponding to the current guess.
             guesses = [b for b in bin(num)[2:].zfill(num_guess)]
+
+            # Get the dictionary mapping timed words to guesses.
             resets = dict()
             for i, twS in enumerate(sorted(self.S)):
                 if twS != ():
@@ -158,17 +197,24 @@ class Learner:
             if self.isResetForbidden(resets):
                 continue
 
+            # Form the mapping from S and R to S. First, fill in the
+            # obvious cases.
             foundR = dict()
             for twS in self.S:
                 foundR[twS] = twS
             for twR, infoR in self.R.items():
                 if infoR.is_sink:
                     foundR[twR] = 'sink'
+
+            # Now consider the remaining cases. For each R, and for each S,
+            # find the time values under the current guess of resets. Then
+            # compare using the timed words in E after performing the required
+            # shifts.
             for twR, infoR in non_sink_R.items():
                 foundR[twR] = None
-                time_R = infoR.getTimeVals(resets)
+                time_R = infoR.getTimeVal(resets)
                 for twS, infoS in self.S.items():
-                    time_S = infoS.getTimeVals(resets)
+                    time_S = infoS.getTimeVal(resets)
                     is_same = True
                     if infoR.is_accept != infoS.is_accept:
                         is_same = False
@@ -188,22 +234,29 @@ class Learner:
                         if res_R != res_S:
                             is_same = False
                             break
+
                     if is_same:
                         foundR[twR] = twS
                         foundR_all[twR] = twS
                         break
 
+            # If all keys in R can be mapped, return the results.
             if all(foundR[twR] is not None for twR in foundR):
                 return resets, foundR
 
-        # failed
+        # Cannot find a guess.
         return None, foundR_all
 
     def checkConsistent(self, resets, foundR):
         """Check whether the table is consistent.
 
         resets - guessed reset information for each entry in S and R.
-        foundR - mapping from rows in R to rows in S.
+        foundR - mapping from rows in S and R to rows in S.
+
+        The consistency check is as follows: for each pair of nonempty keys
+        in S and R, if their immediate prefix is assigned the same, and the
+        last action and time are the same, then they should be assigned the
+        same.
 
         """
         rows = dict()
@@ -215,8 +268,8 @@ class Learner:
             for tw2 in rows:
                 if tw1 != () and tw2 != () and foundR[tw1] != foundR[tw2] and \
                     foundR[tw1[:-1]] == foundR[tw2[:-1]] and tw1[-1].action == tw2[-1].action:
-                    time_val1 = rows[tw1[:-1]].getTimeVals(resets)
-                    time_val2 = rows[tw2[:-1]].getTimeVals(resets)
+                    time_val1 = rows[tw1[:-1]].getTimeVal(resets)
+                    time_val2 = rows[tw2[:-1]].getTimeVal(resets)
                     if tw1[-1].time + time_val1 == tw2[-1].time + time_val2:
                         # Witness for inconsistency, return new value of E
                         if self.ota.runTimedWord(tw1) != self.ota.runTimedWord(tw2):
@@ -250,7 +303,7 @@ class Learner:
         """Construct candidate OTA from current information
         
         resets - guessed reset information for each entry in S and R.
-        foundR - mapping from rows in R to rows in S.
+        foundR - mapping from rows in S and R to rows in S (or the sink).
         
         """
         # Mapping from timed words to location names.
@@ -281,20 +334,20 @@ class Learner:
                 cur_loc = locations[twS]
                 if twS[:-1] in locations:
                     prev_loc = locations[twS[:-1]]
-                    start_time = self.S[twS[:-1]].getTimeVals(resets)
+                    start_time = self.S[twS[:-1]].getTimeVal(resets)
                 else:
                     prev_loc = locations[foundR[twS[:-1]]]
-                    start_time = self.R[twS[:-1]].getTimeVals(resets)
+                    start_time = self.R[twS[:-1]].getTimeVal(resets)
                 transitions[prev_loc][twS[-1].action].append((start_time + twS[-1].time, resets[twS], cur_loc))
         
         # Fill in transitions using R.
         for twR in self.R:
             if twR[:-1] in locations:
                 prev_loc = locations[twR[:-1]]
-                start_time = self.S[twR[:-1]].getTimeVals(resets)
+                start_time = self.S[twR[:-1]].getTimeVal(resets)
             else:
                 prev_loc = locations[foundR[twR[:-1]]]
-                start_time = self.R[twR[:-1]].getTimeVals(resets)
+                start_time = self.R[twR[:-1]].getTimeVal(resets)
             if self.R[twR].is_sink:
                 transitions[prev_loc][twR[-1].action].append((start_time + twR[-1].time, True, locations['sink']))
             else:
@@ -364,17 +417,27 @@ def learn_ota(ota):
         while True:
             resets, foundR = learner.findReset()
             print(learner)
-            print('resets', resets)
-            print('foundR', dict((k,v) for k, v in foundR.items() if k != v and v != 'sink'))
             if resets is None:
+                # No possible choice of resets with the current S.
                 hasAddToS = False
                 for twR in foundR:
                     if foundR[twR] is None:
+                        print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR)))
                         learner.addToS(twR)
                         hasAddToS = True
                         break
                 assert hasAddToS
             else:
+                # Found possible choice of resets.
+                print('resets:')
+                for tws, v in resets.items():
+                    print('  %s: %s' % (','.join(str(tw) for tw in tws), v))
+                print('foundR:')
+                for tws, target in foundR.items():
+                    if tws != target and target != 'sink':
+                        print('  %s -> %s' % (','.join(str(tw) for tw in tws),
+                                              ','.join(str(tw) for tw in target)))
+                print()
                 newE = learner.checkConsistent(resets, foundR)
                 if newE == 'contradiction':
                     learner.forbidResets.append(resets)
