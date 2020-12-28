@@ -107,9 +107,6 @@ class Learner:
         # List of discriminator sequences
         self.E = []
 
-        # list of forbidden reset patterns
-        self.forbidResets = []
-
         self.addPath(())
         self.addToS(())
 
@@ -158,17 +155,6 @@ class Learner:
                 self.R[cur_tws] = TestSequence(cur_tws, cur_res)
             if cur_res == -1:  # stop when already reached sink
                 break
-        
-    def isResetForbidden(self, reset):
-        for forbidReset in self.forbidResets:
-            agree = True
-            for tw in forbidReset:
-                if forbidReset[tw] != reset[tw]:
-                    agree = False
-                    break
-            if agree:
-                return True
-        return False
 
     def findReset(self):
         """Find a valid setting of resets.
@@ -204,9 +190,6 @@ class Learner:
                     resets[twS] = False if guesses[i-1] == '0' else True
             for i, twR in enumerate(sorted(non_sink_R)):
                 resets[twR] = False if guesses[i+len(self.S)-1] == '0' else True
-
-            if self.isResetForbidden(resets):
-                continue
 
             # Form the mapping from S and R to S. First, fill in the
             # obvious cases.
@@ -257,6 +240,12 @@ class Learner:
 
             # Check if the mapping contains forbidden pairs
             if not self.checkForbiddenPairs(resets, foundR):
+                continue
+
+            # Check consistency of the resulting table
+            newE = self.checkConsistent(resets, foundR)
+            if newE:
+                self.E.append(newE)
                 continue
 
             # After all validity checks, return results
@@ -317,7 +306,7 @@ class Learner:
                     foundR[tw1[:-1]] == foundR[tw2[:-1]] and tw1[-1].action == tw2[-1].action:
                     time_val1 = rows[tw1[:-1]].getTimeVal(resets)
                     time_val2 = rows[tw2[:-1]].getTimeVal(resets)
-                    if tw1[-1].time + time_val1 == tw2[-1].time + time_val2:
+                    if isSameRegion(tw1[-1].time + time_val1, tw2[-1].time + time_val2):
                         # Witness for inconsistency, return new value of E
                         if self.ota.runTimedWord(tw1) != self.ota.runTimedWord(tw2):
                             newE = ()
@@ -338,11 +327,10 @@ class Learner:
                                 if res1 != res2:
                                     newE = twE
                                     break
-                        assert newE is not None
+                        assert newE is not None, 'witness not found'
                         newE = (TimedWord(tw1[-1].action, min(tw1[-1].time, tw2[-1].time)),) + newE
+                        print('Add new E:', newE)
                         return newE
-                    if int(tw1[-1].time + time_val1) == int(tw2[-1].time + time_val2):
-                        return 'contradiction'
 
         return None
 
@@ -473,49 +461,41 @@ def learn_ota(ota):
     """Overall learning loop."""
     learner = Learner(ota)
     assist_ota = buildAssistantOTA(ota)
-    for i in range(20):
-        while True:
-            resets, foundR = learner.findReset()
-            print(learner)
-            if resets is None:
-                # No possible choice of resets with the current S.
-                # Find an element in foundR with entry None to add to S.
-                assert any(v is None for twR, v in foundR.items()), "Cannot find row to add to S."
-                for twR, v in sorted(foundR.items()):
-                    if v is None:
-                        # Add the shortest prefix of twR not currently in S.
-                        for i in range(len(twR)+1):
-                            if twR[:i] not in learner.S:
-                                print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR[:i])))
-                                learner.addToS(twR[:i])
-                                break
-                        break
-            else:
-                # Found possible choice of resets.
-                print('resets:')
-                for tws, v in resets.items():
-                    print('  %s: %s' % (','.join(str(tw) for tw in tws), v))
-                print('foundR:')
-                for tws, target in foundR.items():
-                    if tws != target and target != 'sink':
-                        print('  %s -> %s' % (','.join(str(tw) for tw in tws),
-                                              ','.join(str(tw) for tw in target) if target else '()'))
-                print()
-                newE = learner.checkConsistent(resets, foundR)
-                if newE == 'contradiction':
-                    learner.forbidResets.append(resets)
-                elif newE is not None:
-                    learner.E.append(newE)
-                else:
+    for i in range(15):
+        resets, foundR = learner.findReset()
+        print(learner)
+        if resets is None:
+            # No possible choice of resets with the current S.
+            # Find an element in foundR with entry None to add to S.
+            assert any(v is None for twR, v in foundR.items()), "Cannot find row to add to S."
+            for twR, v in sorted(foundR.items()):
+                if v is None:
+                    # Add the shortest prefix of twR not currently in S.
+                    for i in range(len(twR)+1):
+                        if twR[:i] not in learner.S:
+                            print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR[:i])))
+                            learner.addToS(twR[:i])
+                            break
                     break
+        else:
+            # Found possible choice of resets.
+            print('resets:')
+            for tws, v in resets.items():
+                print('  %s: %s' % (','.join(str(tw) for tw in tws), v))
+            print('foundR:')
+            for tws, target in foundR.items():
+                if tws != target and target != 'sink':
+                    print('  %s -> %s' % (','.join(str(tw) for tw in tws),
+                                            ','.join(str(tw) for tw in target) if target else '()'))
+            print()
 
-        candidate = learner.buildCandidateOTA(resets, foundR)
-        print(candidate)
-        res, ctx = ota_equivalent(10, assist_ota, candidate)
-        if res:
-            print('Finished in %s steps' % i)
-            break
-        # print(res, ctx)
-        ctx_path = ctx.find_path(assist_ota, candidate)
-        print('Counterexample', ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
-        learner.addPath(ctx_path)
+            candidate = learner.buildCandidateOTA(resets, foundR)
+            print(candidate)
+            res, ctx = ota_equivalent(10, assist_ota, candidate)
+            if res:
+                print('Finished in %s steps' % i)
+                break
+
+            ctx_path = ctx.find_path(assist_ota, candidate)
+            print('Counterexample', ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
+            learner.addPath(ctx_path)
