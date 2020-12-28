@@ -156,6 +156,38 @@ class Learner:
             if cur_res == -1:  # stop when already reached sink
                 break
 
+    def findDistinguishingSuffix(self, info1, info2, resets):
+        """Check whether the two timed words are equivalent.
+        
+        If equivalent according to the current E, return None.
+
+        Otherwise, return the distinguishing suffix (which works by shifting
+        the first timed word to align the clock).
+
+        """
+        if info1.is_accept != info2.is_accept or info1.is_sink != info2.is_sink:
+            return tuple()  # empty suffix is distinguishing
+
+        time1 = info1.getTimeVal(resets)
+        time2 = info2.getTimeVal(resets)
+
+        for twE in self.E:
+            if time1 == time2:
+                res1 = info1.testSuffix(self.ota, twE)
+                res2 = info2.testSuffix(self.ota, twE)
+            elif time1 < time2:
+                shift = time2 - time1
+                res1 = info1.testSuffix(self.ota, twE, shift)
+                res2 = info2.testSuffix(self.ota, twE)
+            else:  # time1 > time2
+                shift = time1 - time2
+                res1 = info1.testSuffix(self.ota, twE)
+                res2 = info2.testSuffix(self.ota, twE, shift)
+            if res1 != res2:
+                return twE
+
+        return None
+
     def findReset(self):
         """Find a valid setting of resets.
         
@@ -173,10 +205,10 @@ class Learner:
                           if not infoR.is_sink)
         num_guess = len(self.S) + len(non_sink_R) - 1
 
-        # Record whether it is possible to find a match in S.
-        foundR_all = dict()
+        # For each non-sink R, find the number of times with match in S.
+        foundR_count = dict()
         for twR in non_sink_R:
-            foundR_all[twR] = None
+            foundR_count[twR] = 0
 
         # Iterate over the guesses.
         for num in range(2 ** num_guess):
@@ -206,32 +238,12 @@ class Learner:
             # shifts.
             for twR, infoR in non_sink_R.items():
                 foundR[twR] = None
-                time_R = infoR.getTimeVal(resets)
                 for twS, infoS in self.S.items():
-                    time_S = infoS.getTimeVal(resets)
-                    is_same = True
-                    if infoR.is_accept != infoS.is_accept:
-                        is_same = False
+                    suffix = self.findDistinguishingSuffix(infoR, infoS, resets)
 
-                    for twE in self.E:
-                        if time_R == time_S:
-                            res_R = infoR.testSuffix(self.ota, twE)
-                            res_S = infoS.testSuffix(self.ota, twE)
-                        elif time_R < time_S:
-                            shift_R = time_S - time_R
-                            res_R = infoR.testSuffix(self.ota, twE, shift_R)
-                            res_S = infoS.testSuffix(self.ota, twE)
-                        else:  # time_R > time_S
-                            shift_S = time_R - time_S
-                            res_R = infoR.testSuffix(self.ota, twE)
-                            res_S = infoS.testSuffix(self.ota, twE, shift_S)
-                        if res_R != res_S:
-                            is_same = False
-                            break
-
-                    if is_same:
+                    if suffix is None:
                         foundR[twR] = twS
-                        foundR_all[twR] = twS
+                        foundR_count[twR] += 1
                         break
 
             # Check if all rows in R can be mapped
@@ -240,6 +252,10 @@ class Learner:
 
             # Check if the mapping contains forbidden pairs
             if not self.checkForbiddenPairs(resets, foundR):
+                continue
+
+            # Check if the mapping contains invalid rows
+            if not self.checkInvalidRow(resets, foundR):
                 continue
 
             # Check consistency of the resulting table
@@ -252,7 +268,7 @@ class Learner:
             return resets, foundR
 
         # Cannot find a guess.
-        return None, foundR_all
+        return None, foundR_count
 
     def checkForbiddenPairs(self, resets, foundR):
         """Check validity of reset information.
@@ -276,6 +292,29 @@ class Learner:
             for tw2 in rows:
                 if tw1 != () and tw2 != () and resets[tw1] != resets[tw2] and \
                     foundR[tw1[:-1]] == foundR[tw2[:-1]] and tw1[-1].action == tw2[-1].action:
+                    time_val1 = rows[tw1[:-1]].getTimeVal(resets)
+                    time_val2 = rows[tw2[:-1]].getTimeVal(resets)
+                    if isSameRegion(tw1[-1].time + time_val1, tw2[-1].time + time_val2):
+                        return False
+
+        return True
+
+    def checkInvalidRow(self, resets, foundR):
+        """Check whether there are invalid rows.
+
+        An invalid row is given by the fact that it can be distinguished from
+        itself under the given resets.
+
+        """
+        rows = dict()
+        for tws in self.S:
+            rows[tws] = self.S[tws]
+        for tws in self.R:
+            rows[tws] = self.R[tws]
+        for tw1 in rows:
+            for tw2 in rows:
+                if tw1 != () and tw2 != () and foundR[tw1] != foundR[tw2] and \
+                    tw1[:-1] == tw2[:-1] and tw1[-1].action == tw2[-1].action:
                     time_val1 = rows[tw1[:-1]].getTimeVal(resets)
                     time_val2 = rows[tw2[:-1]].getTimeVal(resets)
                     if isSameRegion(tw1[-1].time + time_val1, tw2[-1].time + time_val2):
@@ -308,27 +347,18 @@ class Learner:
                     time_val2 = rows[tw2[:-1]].getTimeVal(resets)
                     if isSameRegion(tw1[-1].time + time_val1, tw2[-1].time + time_val2):
                         # Witness for inconsistency, return new value of E
-                        if self.ota.runTimedWord(tw1) != self.ota.runTimedWord(tw2):
-                            newE = ()
-                        else:
-                            newE = None
-                            for twE in self.E:
-                                if time_val1 == time_val2:
-                                    res1 = rows[tw1].testSuffix(self.ota, twE)
-                                    res2 = rows[tw2].testSuffix(self.ota, twE)
-                                elif time_R < time_S:
-                                    shift_R = time_S - time_R
-                                    res1 = rows[tw1].testSuffix(self.ota, twE, shift_R)
-                                    res2 = rows[tw2].testSuffix(self.ota, twE)
-                                else:  # time_R > time_S
-                                    shift_S = time_R - time_S
-                                    res1 = rows[tw1].testSuffix(self.ota, twE)
-                                    res2 = rows[tw2].testSuffix(self.ota, twE, shift_S)
-                                if res1 != res2:
-                                    newE = twE
-                                    break
-                        assert newE is not None, 'witness not found'
-                        newE = (TimedWord(tw1[-1].action, min(tw1[-1].time, tw2[-1].time)),) + newE
+                        suffix = self.findDistinguishingSuffix(rows[tw1], rows[tw2], resets)
+                        assert suffix is not None, 'No distinguishing suffix found'
+                        newE = (TimedWord(tw1[-1].action, min(tw1[-1].time, tw2[-1].time)),) + suffix
+                        if newE in self.E:
+                            print('resets', resets)
+                            print('tw1', tw1)
+                            print('tw2', tw2)
+                            print('time1', time_val1)
+                            print('time2', time_val2)
+                            print('suffix', suffix)
+                            print('newE', newE)
+                            raise AssertionError('Repeated newE.')
                         # print('Add new E:', newE)
                         return newE
 
@@ -470,17 +500,20 @@ def learn_ota(ota, limit=15, verbose=True):
 
         if resets is None:
             # No possible choice of resets with the current S.
-            # Find an element in foundR with entry None to add to S.
-            assert any(v is None for twR, v in foundR.items()), "Cannot find row to add to S."
-            for twR, v in sorted(foundR.items()):
-                if v is None:
-                    # Add the shortest prefix of twR not currently in S.
-                    for i in range(len(twR)+1):
-                        if twR[:i] not in learner.S:
-                            if verbose:
-                                print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR[:i])))
-                            learner.addToS(twR[:i])
-                            break
+            # Find an element in foundR with small count and to add to S.
+            print(foundR)
+            min_key, min_count = None, None
+            for twR, count in sorted(foundR.items()):
+                if min_count is None or count < min_count:
+                    min_key, min_count = twR, count
+            assert min_key is not None
+
+            # Add the shortest prefix of twR not currently in S.
+            for i in range(len(min_key)+1):
+                if min_key[:i] not in learner.S:
+                    if verbose:
+                        print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in min_key[:i])))
+                    learner.addToS(min_key[:i])
                     break
         else:
             # Found possible choice of resets.
