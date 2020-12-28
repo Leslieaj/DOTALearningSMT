@@ -49,7 +49,7 @@ class LearnerTest(unittest.TestCase):
 
     def testLearn(self):
         ota = buildOTA('./examples/e.json')
-        learn_ota(ota)
+        learn_ota(ota, limit=15, verbose=False)
 
 
 if __name__ == "__main__":

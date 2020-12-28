@@ -457,13 +457,16 @@ class Learner:
         return candidateOTA
 
 
-def learn_ota(ota):
+def learn_ota(ota, limit=15, verbose=True):
     """Overall learning loop."""
     learner = Learner(ota)
     assist_ota = buildAssistantOTA(ota)
-    for i in range(15):
+    for i in range(limit):
         resets, foundR = learner.findReset()
-        print(learner)
+
+        if verbose:
+            print(learner)
+
         if resets is None:
             # No possible choice of resets with the current S.
             # Find an element in foundR with entry None to add to S.
@@ -479,18 +482,20 @@ def learn_ota(ota):
                     break
         else:
             # Found possible choice of resets.
-            print('resets:')
-            for tws, v in resets.items():
-                print('  %s: %s' % (','.join(str(tw) for tw in tws), v))
-            print('foundR:')
-            for tws, target in foundR.items():
-                if tws != target and target != 'sink':
-                    print('  %s -> %s' % (','.join(str(tw) for tw in tws),
-                                            ','.join(str(tw) for tw in target) if target else '()'))
-            print()
+            if verbose:
+                print('resets:')
+                for tws, v in resets.items():
+                    print('  %s: %s' % (','.join(str(tw) for tw in tws), v))
+                print('foundR:')
+                for tws, target in foundR.items():
+                    if tws != target and target != 'sink':
+                        print('  %s -> %s' % (','.join(str(tw) for tw in tws),
+                                                ','.join(str(tw) for tw in target) if target else '()'))
+                print()
 
             candidate = learner.buildCandidateOTA(resets, foundR)
-            print(candidate)
+            if verbose:
+                print(candidate)
             res, ctx = ota_equivalent(10, assist_ota, candidate)
             if res:
                 print('Finished in %s steps' % i)
