@@ -7,6 +7,15 @@ from interval import Interval
 from equivalence import ota_equivalent
 
 
+def isSameRegion(t1, t2):
+    """Check whether t1 and t2 lies in the same region. That is,
+    if they are equal, or if they are both non-integers in the same
+    interval (n, n+1).
+
+    """
+    return t1 == t2 or (int(t1) != t1 and int(t2) != t2 and int(t1) == int(t2))
+
+
 class TestSequence:
     """Represents data for a single test sequence."""
     def __init__(self, tws, res):
@@ -242,12 +251,48 @@ class Learner:
                         foundR_all[twR] = twS
                         break
 
-            # If all keys in R can be mapped, return the results.
-            if all(foundR[twR] is not None for twR in foundR):
-                return resets, foundR
+            # Check if all rows in R can be mapped
+            if not all(foundR[twR] is not None for twR in foundR):
+                continue
+
+            # Check if the mapping contains forbidden pairs
+            if not self.checkForbiddenPairs(resets, foundR):
+                continue
+
+            # After all validity checks, return results
+            return resets, foundR
 
         # Cannot find a guess.
         return None, foundR_all
+
+    def checkForbiddenPairs(self, resets, foundR):
+        """Check validity of reset information.
+
+        The main check is that: for any R1 + (a, t1) and R2 + (a, t2),
+        if foundR[R1] == foundR[R2], and the actions and times are the same,
+        then the reset information should be the same.
+
+        Returns whether the reset information is valid according to the above
+        criteria.
+
+        """
+        rows = dict()
+        for tws in self.S:
+            rows[tws] = self.S[tws]
+        for tws in self.R:
+            if not self.R[tws].is_sink:
+                rows[tws] = self.R[tws]
+
+        for tw1 in rows:
+            for tw2 in rows:
+                if tw1 != () and tw2 != () and resets[tw1] != resets[tw2] and \
+                    foundR[tw1[:-1]] == foundR[tw2[:-1]] and tw1[-1].action == tw2[-1].action:
+                    time_val1 = rows[tw1[:-1]].getTimeVal(resets)
+                    time_val2 = rows[tw2[:-1]].getTimeVal(resets)
+                    if isSameRegion(tw1[-1].time + time_val1, tw2[-1].time + time_val2):
+                        return False
+
+        return True
 
     def checkConsistent(self, resets, foundR):
         """Check whether the table is consistent.
@@ -343,6 +388,7 @@ class Learner:
             trans_time = start_time + twS[-1].time
             if trans_time in transitions[prev_loc][twS[-1].action] and \
                 (resets[twS], cur_loc) != transitions[prev_loc][twS[-1].action][trans_time]:
+                print('When adding transition for', twS)
                 raise AssertionError('Conflict at %s %s %s' % (prev_loc, twS[-1].action, trans_time))
             transitions[prev_loc][twS[-1].action][trans_time] = (resets[twS], cur_loc)
  
@@ -363,10 +409,10 @@ class Learner:
 
             if trans_time in transitions[prev_loc][twR[-1].action] and \
                 (cur_reset, cur_loc) != transitions[prev_loc][twR[-1].action][trans_time]:
+                print('When adding transition for', twR)
                 raise AssertionError('Conflict at %s (%s, %s)' % (prev_loc, twS[-1].action, trans_time))
             transitions[prev_loc][twR[-1].action][trans_time] = cur_reset, cur_loc
 
-        # pprint.PrettyPrinter().pprint(transitions)
         # Sink transitions
         for act in self.actions:
             transitions[locations['sink']][act][0] = (True, locations['sink'])
@@ -433,7 +479,8 @@ def learn_ota(ota):
             print(learner)
             if resets is None:
                 # No possible choice of resets with the current S.
-                hasAddToS = False
+                # Find an element in foundR with entry None to add to S.
+                assert any(v is None for twR, v in foundR.items()), "Cannot find row to add to S."
                 for twR, v in sorted(foundR.items()):
                     if v is None:
                         # Add the shortest prefix of twR not currently in S.
@@ -442,9 +489,7 @@ def learn_ota(ota):
                                 print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR[:i])))
                                 learner.addToS(twR[:i])
                                 break
-                        hasAddToS = True
                         break
-                assert hasAddToS
             else:
                 # Found possible choice of resets.
                 print('resets:')
