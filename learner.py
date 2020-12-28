@@ -329,7 +329,7 @@ class Learner:
                                     break
                         assert newE is not None, 'witness not found'
                         newE = (TimedWord(tw1[-1].action, min(tw1[-1].time, tw2[-1].time)),) + newE
-                        print('Add new E:', newE)
+                        # print('Add new E:', newE)
                         return newE
 
         return None
@@ -461,7 +461,8 @@ def learn_ota(ota, limit=15, verbose=True):
     """Overall learning loop."""
     learner = Learner(ota)
     assist_ota = buildAssistantOTA(ota)
-    for i in range(limit):
+    for i in range(1, limit):
+        print ('Step', i)
         resets, foundR = learner.findReset()
 
         if verbose:
@@ -476,7 +477,8 @@ def learn_ota(ota, limit=15, verbose=True):
                     # Add the shortest prefix of twR not currently in S.
                     for i in range(len(twR)+1):
                         if twR[:i] not in learner.S:
-                            print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR[:i])))
+                            if verbose:
+                                print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in twR[:i])))
                             learner.addToS(twR[:i])
                             break
                     break
@@ -494,13 +496,15 @@ def learn_ota(ota, limit=15, verbose=True):
                 print()
 
             candidate = learner.buildCandidateOTA(resets, foundR)
-            if verbose:
-                print(candidate)
             res, ctx = ota_equivalent(10, assist_ota, candidate)
+            if not res and verbose:
+                print(candidate)
             if res:
+                print(candidate)
                 print('Finished in %s steps' % i)
                 break
 
             ctx_path = ctx.find_path(assist_ota, candidate)
-            print('Counterexample', ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
+            if verbose:
+                print('Counterexample', ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
             learner.addPath(ctx_path)
