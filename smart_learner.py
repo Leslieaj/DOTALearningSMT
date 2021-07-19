@@ -61,7 +61,9 @@ def generate_resets_pairs(tw1, tw2):
 def set_row_reset(index, tw):
     reset = dict()
     for t in range(len(tw)):
-        if t == index:
+        if t < index:
+            continue
+        elif t == index:
             reset[tw[:t+1]] = True
         else:
             reset[tw[:t+1]] = False
@@ -170,11 +172,11 @@ class Learner:
         # S and R are test sequences that are internal and at the boundary.
         self.R = dict()
         
-        # # add (a, 0) for each action in a to R
-        # for act in self.actions:
-        #     tws = (TimedWord(act, 0), )
-        #     res = self.ota.runTimedWord(tws)
-        #     self.R[tws] = TestSequence(tws, res)
+        # add (a, 0) for each action in a to R
+        for act in self.actions:
+            tws = (TimedWord(act, 0), )
+            res = self.ota.runTimedWord(tws)
+            self.R[tws] = TestSequence(tws, res)
 
         # List of discriminator sequences
         self.E = []
@@ -250,16 +252,6 @@ class Learner:
         since (a, t1) and (a, t1)(b, t2) 's reset cannot influence the whole time.
         """
         formula = []
-
-        reset_row = []
-        for row, r in reset.items():
-            if r:
-                reset_row.append(row)
-
-        assert len(reset_row) <= 2, "Too much resets."
-
-        for row, r in reset.items():
-            pass
         for row, r in reset:
             if r:
                 formula.append(resets_var[row])
@@ -282,7 +274,7 @@ class Learner:
             for tw2 in non_sink_row:
                 possible_resets = generate_row_resets(tw1, tw2)
                 for reset in possible_resets:
-                    if self.findDistinguishingSuffix(tw1, tw2, reset) is not None:
+                    if self.findDistinguishingSuffix(non_sink_row[tw1], non_sink_row[tw2], reset) is not None:
                         f = z3.Implies(self.encodeReset(reset, resets_var), states_var[tw1] != states_var[tw2])
                         formula.append(f)
 
@@ -303,7 +295,7 @@ class Learner:
                 if tw1 != () and tw2 != () and tw1[-1].action == tw2[-1].action:
                     possible_resets = generate_row_resets(tw1, tw2)
                     for reset in possible_resets:
-                        if self.findDistinguishingSuffix(tw1, tw2, reset) is None: # maybe in the same states
+                        if self.findDistinguishingSuffix(non_sink_row[tw1], non_sink_row[tw2], reset) is None: # maybe in the same states
                             time_val1 = non_sink_row[tw1[:-1]].getTimeVal(reset)
                             time_val2 = non_sink_row[tw1[:-1]].getTimeVal(reset)
                             if isSameRegion(time_val1+tw1[-1].time, time_val2+tw2[-1].time) and \
@@ -328,7 +320,7 @@ class Learner:
                         and abs(tw1[-1].time - tw2[-1].time < 1):
                     possible_resets = generate_row_resets(tw1, tw2)
                     for reset in possible_resets:
-                        if self.findDistinguishingSuffix(tw1, tw2, reset) is not None:
+                        if self.findDistinguishingSuffix(non_sink_row[tw1], non_sink_row[tw2], reset) is not None:
                             f = self.encodeReset(reset, resets_var)
                             formulas.append(z3.Not(f))
 
@@ -350,10 +342,14 @@ class Learner:
                         time_val1 = non_sink_row[tw1].getTimeVal(reset)
                         time_val2 = non_sink_row[tw2].getTimeVal(reset)
                         if isSameRegion(time_val1+tw1[-1].time, time_val2+tw2[-1].time):
-                            suffix = self.findDistinguishingSuffix(tw1[:-1], tw2[:-1], reset)
+                            suffix = self.findDistinguishingSuffix(non_sink_row[tw1[:-1]], non_sink_row[tw2[:-1]], reset)
                             if suffix is not None:
                                 f = z3.Implies(states_var[tw1[:-1]] == states_var[tw2[:-1]], self.encodeReset(reset, resets_var))
                                 formulas.append(f)
+                                new_E = (TimedWord(tw1[-1].action, min(tw1[-1].time, tw2[-1].time)),) + suffix
+                                if new_E in self.E:
+                                    raise ValueError
+                                self.E.append(new_E)
 
         if formulas:
             return z3.And(formulas)
@@ -375,13 +371,14 @@ class Learner:
 
         # Give each row a state variable and a reset variable
         states_var, resets_var = dict(), dict()
-        
-        s = z3.Solver()
 
         for i, row in enumerate(non_sink_R):
-            states_var[row] = z3.Int("s_%d" % i+1)
-            resets_var[row] = z3.Bool("r_%d" % i+1)
-        
+            states_var[row] = z3.Int("s_%d" % (i+1))
+            resets_var[row] = z3.Bool("r_%d" % (i+1))
+
+        var_states = dict((v, k) for k, v in states_var.items())
+        var_resets = dict((v, k) for k, v in resets_var.items())
+
         # # Limit number of states
         # state_constraint = [z3.And(s>=1, s<=state_num) for s in states_var]
         # s.add(state_constraint)
@@ -389,189 +386,168 @@ class Learner:
         # Constraint 1: if two rows behaves differently under some reset settings, 
         # then we can conclude that their states are not same.
         constraint1 = self.differentStateUnderReset(non_sink_R, states_var, resets_var)
+        constraint2 = self.noForbiddenPair(non_sink_R, states_var, resets_var)
+        constraint3 = self.noInvalidRow(non_sink_R, states_var, resets_var)
+        constraint4 = self.checkConsistency(non_sink_R, states_var, resets_var)
 
-        # Constraint 2: forbidden pair
-                
-        
+        result = "unsat"
+        for i in range(1, len(non_sink_R)+1):
+            constraint5 = z3.And([z3.And(s>=1, s<=i) for s in var_states])
+            s = z3.Solver()
+            s.add(constraint1, constraint2, constraint3, constraint4, constraint5)
+            if str(s.check()) == "sat":
+                result = "sat"
+                break
+            else:
+                continue
+
+        if result == "unsat": # why?
+            return None, None
+
+        model = s.model()
+        resets, states = dict(), dict()
+
+        for v in model:
+            if v.range().is_int():
+                states[var_states[z3.Int(str(v))]] = str(model[v])
+            elif v.range().is_bool():
+                resets[var_resets[z3.Bool(str(v))]] = model[v]
+            else:
+                raise NotImplementedError
+
+        states["sink"] = str(i + 1)
+
+        return resets, states
 
 
+    def buildCandidateOTA(self, resets, states):
+        """Construct candidate OTA from current information.
 
+        resets - guessed reset information for each entry in R.
+        states - guessed state mapping for each entry in R.
+        """
+        states_num = int(states["sink"])
 
-#     def buildCandidateOTA(self, resets, foundR):
-#         """Construct candidate OTA from current information
-        
-#         resets - guessed reset information for each entry in S and R.
-#         foundR - mapping from rows in S and R to rows in S (or the sink).
-        
-#         """
-#         # Mapping from timed words to location names.
-#         # Each path in S should correspond to a location.
-#         locations = dict()
-#         for i, twS in enumerate(sorted(self.S)):
-#             locations[twS] = str(i+1)
-#         locations['sink'] = str(len(self.S)+1)
-        
-#         # Mapping from location, action and time to transitions,
-#         # in the form of (reset, target).
-#         transitions = dict()
-#         for i in range(len(self.S)+1):
-#             name = str(i+1)
-#             transitions[name] = dict()
-#             for act in self.actions:
-#                 transitions[name][act] = dict()
+        # Mapping from location, action and time to transitions,
+        # in the form of (reset, target)
+        # transitions: states -> action -> time -> (reset, state)
+        transitions = dict()
+        for i in range(states_num):
+            name = str(i+1)
+            transitions[name] = dict()
+            for act in self.actions:
+                transitions[name][act] = dict()
 
-#         # List of accept states
-#         accepts = []
-#         for twS in locations:
-#             if twS != 'sink' and self.S[twS].is_accept:
-#                 accepts.append(locations[twS])
-        
-#         # Fill in transitions using prefix in S. For each nonempty entry
-#         # in S, find its immediate predecessor.
-#         for twS in sorted(self.S):
-#             if twS == ():
-#                 continue
+        # List of accept states
+        accepts = []
+        for row in states:
+            if row != 'sink' and self.R[row].is_accept:
+                accepts.append(states[row])
 
-#             cur_loc = locations[twS]
-#             assert twS[:-1] in locations, 'S is not prefix closed'
-#             prev_loc = locations[twS[:-1]]
-#             start_time = self.S[twS[:-1]].getTimeVal(resets)
-#             trans_time = start_time + twS[-1].time
-#             if trans_time in transitions[prev_loc][twS[-1].action] and \
-#                 (resets[twS], cur_loc) != transitions[prev_loc][twS[-1].action][trans_time]:
-#                 print('When adding transition for', twS)
-#                 raise AssertionError('Conflict at %s %s %s' % (prev_loc, twS[-1].action, trans_time))
-#             transitions[prev_loc][twS[-1].action][trans_time] = (resets[twS], cur_loc)
- 
-#         # Fill in transitions using R.
-#         for twR in self.R:
-#             if twR[:-1] in locations:
-#                 prev_loc = locations[twR[:-1]]
-#                 start_time = self.S[twR[:-1]].getTimeVal(resets)
-#             else:
-#                 prev_loc = locations[foundR[twR[:-1]]]
-#                 start_time = self.R[twR[:-1]].getTimeVal(resets)
+        # Fill in transitions using R.
+        for twR in sorted(self.R):
+            if twR == ():
+                continue
             
-#             trans_time = start_time + twR[-1].time
-#             if self.R[twR].is_sink:
-#                 cur_reset, cur_loc = True, locations['sink']
-#             else:
-#                 cur_reset, cur_loc = resets[twR], locations[foundR[twR]]
+            prev_loc = states[twR[:-1]]
+            start_time = self.R[twR[:-1]].getTimeVal(resets)
+            trans_time = start_time + twR[-1].time
+            if self.R[twR].is_sink:
+                cur_reset, cur_loc = True, states['sink']
+            else:
+                cur_reset, cur_loc = resets[twR], states[twR]
 
-#             if trans_time in transitions[prev_loc][twR[-1].action] and \
-#                 (cur_reset, cur_loc) != transitions[prev_loc][twR[-1].action][trans_time]:
-#                 print('When adding transition for', twR)
-#                 raise AssertionError('Conflict at %s (%s, %s)' % (prev_loc, twS[-1].action, trans_time))
-#             transitions[prev_loc][twR[-1].action][trans_time] = cur_reset, cur_loc
+            if trans_time in transitions[prev_loc][twR[-1].action] and\
+                    (cur_reset, cur_loc) != transitions[prev_loc][twR[-1].action][trans_time]:
+                print('When adding transition for', twR)
+                raise AssertionError('Conflict at %s (%s, %s)' % (prev_loc, twR[-1].action, trans_time))
+            transitions[prev_loc][twR[-1].action][trans_time] = cur_reset, cur_loc
 
-#         # Sink transitions
-#         for act in self.actions:
-#             transitions[locations['sink']][act][0] = (True, locations['sink'])
+        # Sink transitions
+        for act in self.actions:
+            transitions[states["sink"]][act][0] = (True, states["sink"])
 
-#         # From the dictionary of transitions, form the list otaTrans.
-#         otaTrans = []
-#         for source in transitions:
-#             for action, trans in transitions[source].items():
-#                 # Sort and remove duplicates
-#                 trans = sorted((time, reset, target) for time, (reset, target) in trans.items())
-#                 trans_new = [trans[0]]
-#                 for i in range(1, len(trans)):
-#                     time, reset, target = trans[i]
-#                     prev_time, prev_reset, prev_target = trans[i-1]
-#                     if reset != prev_reset or target != prev_target:
-#                         trans_new.append(trans[i])
-#                 trans = trans_new
+        # From the dictionary of transitions, form the list otaTrans
+        otaTrans = []
+        for source in transitions:
+            for action, trans in transitions[source].items():
+                # Sort and remove duplicates
+                trans = sorted((time, reset, target) for time, (reset, target) in trans.items())
+                trans_new = [trans[0]]
+                for i in range(1, len(trans)):
+                    time, reset, target = trans[i]
+                    prev_time, prev_reset, prev_target = trans[i-1]
+                    if reset != prev_reset or target != prev_target:
+                        trans_new.append(trans[i])
+                trans = trans_new
 
-#                 # Change to otaTrans.
-#                 for i in range(len(trans)):
-#                     time, reset, target = trans[i]                            
-#                     if int(time) == time:
-#                         min_value, closed_min = int(time), True
-#                     else:
-#                         min_value, closed_min = int(time), False
-#                     if i < len(trans)-1:
-#                         time2, reset2, target2 = trans[i+1]
-#                         if int(time2) == time2:
-#                             max_value, closed_max = int(time2), False
-#                         else:
-#                             max_value, closed_max = int(time2), True
-#                         constraint = Interval(min_value, closed_min, max_value, closed_max)
-#                     else:
-#                         constraint = Interval(min_value, closed_min, '+', False)
-#                     otaTrans.append(OTATran(source, action, constraint, reset, target))
+                # Change to otaTrans.
+                for i in range(len(trans)):
+                    time, reset, target = trans[i]
+                    if int(time) == time:
+                        min_value, closed_min = int(time), True
+                    else:
+                        min_value, closed_min = int(time), False
+                    if i < len(trans)-1:
+                        time2, reset2, target2 = trans[i+1]
+                        if int(time2) == time2:
+                            max_value, closed_max = int(time2), True
+                        else:
+                            max_value, closed_max = int(time2), False
+                        constraint = Interval(min_value, closed_min, max_value, closed_max)
+                    else:
+                        constraint = Interval(min_value, closed_min, '+', False)
 
-#         # Form the Location objects.
-#         location_objs = []
-#         for tw, loc in locations.items():
-#             if tw == 'sink':
-#                 location_objs.append(Location(loc, False, False, True))
-#             else:
-#                 location_objs.append(Location(loc, (tw == ()), self.S[tw].is_accept, self.S[tw].is_sink))
+            # Form the location objects
+            location_objs = []
+            for tw, loc in states.items():
+                if tw == "sink":
+                    location_objs.append(Location(loc, False, False, True))
+                else:
+                    location_objs.append(Location(loc, (tw==()), self.R[tw].is_accept, self.R[tw].is_sink))
 
-#         candidateOTA = OTA(
-#             name=self.ota.name + '_',
-#             sigma=self.actions,
-#             locations=location_objs,
-#             trans=otaTrans,
-#             init_state='1',
-#             accept_states=accepts,
-#             sink_name=locations['sink'])
+            candidateOTA = OTA(
+                name=self.ota.name + '_',
+                sigma=self.actions,
+                locations=location_objs,
+                trans=otaTrans,
+                init_state='1',
+                accept_states=accepts,
+                sink_name=states['sink'])
 
-#         return candidateOTA
-
+            return candidateOTA
 
 
-# def learn_ota(ota, limit=15, verbose=True):
-#     """Overall learning loop."""
-#     learner = Learner(ota)
-#     assist_ota = buildAssistantOTA(ota)
-#     for i in range(1, limit):
-#         print ('Step', i)
-#         resets, foundR = learner.findReset()
+def learn_ota(ota, limit=15, verbose=True):
+    """Overall learning loop."""
+    learner = Learner(ota)
+    assist_ota = buildAssistantOTA(ota)
+    for i in range(1, limit):
+        print("Step", i)
+        resets, states = learner.findReset()
 
-#         if verbose:
-#             print(learner)
+        if verbose:
+            print(learner)
 
-#         if resets is None:
-#             # No possible choice of resets with the current S.
-#             # Find an element in foundR with small count and to add to S.
-#             print(foundR)
-#             min_key, min_count = None, None
-#             for twR, count in sorted(foundR.items()):
-#                 if min_count is None or count < min_count:
-#                     min_key, min_count = twR, count
-#             assert min_key is not None
+        if resets is None:
+            # No possible choice of resets with the current S.
+            raise NotImplementedError
 
-#             # Add the shortest prefix of twR not currently in S.
-#             for i in range(len(min_key)+1):
-#                 if min_key[:i] not in learner.S:
-#                     if verbose:
-#                         print('No possible reset found. Add %s to S' % (','.join(str(tw) for tw in min_key[:i])))
-#                     learner.addToS(min_key[:i])
-#                     break
-#         else:
-#             # Found possible choice of resets.
-#             if verbose:
-#                 print('resets:')
-#                 for tws, v in resets.items():
-#                     print('  %s: %s' % (','.join(str(tw) for tw in tws), v))
-#                 print('foundR:')
-#                 for tws, target in foundR.items():
-#                     if tws != target and target != 'sink':
-#                         print('  %s -> %s' % (','.join(str(tw) for tw in tws),
-#                                                 ','.join(str(tw) for tw in target) if target else '()'))
-#                 print()
+        if verbose:
+            print("resets and states:")
+            for tws, v in resets.items():
+                print("  %s: %s %s" % (",".join(str(tw) for tw in tws), v, states[tws]))
 
-#             candidate = learner.buildCandidateOTA(resets, foundR)
-#             res, ctx = ota_equivalent(10, assist_ota, candidate)
-#             if not res and verbose:
-#                 print(candidate)
-#             if res:
-#                 print(candidate)
-#                 print('Finished in %s steps' % i)
-#                 break
+        candidate = learner.buildCandidateOTA(resets, states)
+        res, ctx = ota_equivalent(10, assist_ota, candidate)
+        if not res and verbose:
+            print(candidate)
+        if res:
+            print(candidate)
+            print("Finished in %s steps " % i)
+            break
 
-#             ctx_path = ctx.find_path(assist_ota, candidate)
-#             if verbose:
-#                 print('Counterexample', ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
-#             learner.addPath(ctx_path)
+        ctx_path = ctx.find_path(assist_ota, candidate)
+        if verbose:
+            print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
+        learner.addPath(ctx_path)
