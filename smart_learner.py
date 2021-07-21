@@ -344,8 +344,11 @@ class Learner:
                     possible_resets = generate_row_resets_enhance(tw1, tw2)
                     for reset in possible_resets:
                         if self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset) is not None:
-                            f = self.encodeReset(reset, resets_var)
-                            formulas.append(z3.Not(f))
+                            time_val1 = self.R[tw1[:-1]].getTimeVal(reset)
+                            time_val2 = self.R[tw2[:-1]].getTimeVal(reset)
+                            if isSameRegion(time_val1+tw1[-1].time, time_val2+tw2[-1].time):
+                                f = self.encodeReset(reset, resets_var)
+                                formulas.append(z3.Not(f))
 
         if formulas:
             return z3.And(formulas)
@@ -353,18 +356,20 @@ class Learner:
             return True
 
     def checkConsistency(self, states_var, resets_var):
-        """Constraint 4: for any two rows R1 + (a, t), R2 + (a, t). If R1 and R2 are
+        """Constraint 4: for any two rows R1 + (a, t1), R2 + (a, t2). If R1 and R2 are
         in the same states, and under the current reset settings these two rows are in
         the same time interval, then their states should also be same."""
         formulas = []
         for tw1 in self.R:
             for tw2 in self.R:
-                if tw1 != () and tw2 != () and tw1[-1] == tw2[-1]:
+                if tw1 == (TimedWord('a', 1), TimedWord('b', 3)) and tw2 == (TimedWord('a', 1), TimedWord('b', 3), TimedWord('b', 0)):
+                    print(tw1)
+                if tw1 != () and tw2 != () and tw1[-1].action == tw2[-1].action:
                     possible_resets = generate_row_resets_enhance(tw1, tw2)
                     for reset in possible_resets:
                         if self.findDistinguishingSuffix(self.R[tw1[:-1]], self.R[tw2[:-1]], reset) is None: # tw[:-1] and tw2[:-1] may in the same states
-                            time_val1 = self.R[tw1].getTimeVal(reset)
-                            time_val2 = self.R[tw2].getTimeVal(reset)
+                            time_val1 = self.R[tw1[:-1]].getTimeVal(reset)
+                            time_val2 = self.R[tw2[:-1]].getTimeVal(reset)
                             if isSameRegion(time_val1+tw1[-1].time, time_val2+tw2[-1].time):
                                 suffix = self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset)
                                 if suffix is not None:
@@ -440,7 +445,7 @@ class Learner:
             if isinstance(model[v], z3.ArithRef):
                 states[var_states[z3.Int(str(v))]] = str(model[v])
             elif isinstance(model[v], z3.BoolRef):
-                resets[var_resets[z3.Bool(str(v))]] = model[v]
+                resets[var_resets[z3.Bool(str(v))]] = bool(model[v])
             else:
                 raise NotImplementedError
 
@@ -534,24 +539,24 @@ class Learner:
                         constraint = Interval(min_value, closed_min, '+', False)
                     otaTrans.append(OTATran(source, action, constraint, reset, target))
 
-            # Form the location objects
-            location_objs = []
-            for tw, loc in states.items():
-                if tw == "sink":
-                    location_objs.append(Location(loc, False, False, True))
-                else:
-                    location_objs.append(Location(loc, (tw==()), self.R[tw].is_accept, self.R[tw].is_sink))
+        # Form the location objects
+        location_objs = []
+        for tw, loc in states.items():
+            if tw == "sink":
+                location_objs.append(Location(loc, False, False, True))
+            else:
+                location_objs.append(Location(loc, (tw==()), self.R[tw].is_accept, self.R[tw].is_sink))
 
-            candidateOTA = OTA(
-                name=self.ota.name + '_',
-                sigma=self.actions,
-                locations=location_objs,
-                trans=otaTrans,
-                init_state='1',
-                accept_states=accepts,
-                sink_name=states['sink'])
+        candidateOTA = OTA(
+            name=self.ota.name + '_',
+            sigma=self.actions,
+            locations=location_objs,
+            trans=otaTrans,
+            init_state='1',
+            accept_states=accepts,
+            sink_name=states['sink'])
 
-            return candidateOTA
+        return candidateOTA
 
 
 def learn_ota(ota, limit=30, verbose=True):
@@ -560,6 +565,8 @@ def learn_ota(ota, limit=30, verbose=True):
     assist_ota = buildAssistantOTA(ota)
     for i in range(1, limit):
         print("Step", i)
+        if i == 5:
+            i
         resets, states = learner.findReset()
 
         if verbose:
