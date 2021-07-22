@@ -433,7 +433,6 @@ class Learner:
         constraints.append(self.noInvalidRow(states_var, resets_var))
         constraints.append(self.checkConsistency(states_var, resets_var)) 
         constraints.append(self.setSinkRowReset(resets_var))
-        constraints.append(states_var[tuple()]==1)
 
         result = "unsat"
         for i in range(1, len(non_sink_R)+1):
@@ -445,7 +444,7 @@ class Learner:
                     constraint6.append(z3.And(s>=1, s<=i))
             constraint6 = z3.And(constraint6)
             s = z3.Solver()
-            s.add(constraints+[constraint6])
+            s.add(*constraints, constraint6, states_var[tuple()]==1)
             if str(s.check()) == "sat":
                 result = "sat"
                 break
