@@ -215,11 +215,14 @@ class Learner:
             cur_res = self.ota.runTimedWord(cur_tws)
             if cur_tws not in self.R:
                 self.R[cur_tws] = TestSequence(cur_tws, cur_res)
-                if cur_res != -1:
+                # keep adding (act, 0) until tw goes to sink
+                while cur_res != -1:
                     for act in self.actions:
                         cur_tws_act = cur_tws + (TimedWord(act, 0),)
                         cur_res_act = self.ota.runTimedWord(cur_tws_act)
                         self.R[cur_tws_act] = TestSequence(cur_tws_act, cur_res_act)
+
+                    cur_tws, cur_res = cur_tws_act, cur_res_act
             if cur_res == -1:  # stop when already reached sink
                 break
 
