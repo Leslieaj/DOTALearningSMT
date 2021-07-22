@@ -38,22 +38,30 @@ def isPrefix(tw1, tw2):
         if tw1[i] != tw2[i]:
             return False
 
+# def generate_resets_pairs(tw1, tw2):
+#     """
+#     Return the possible reset pairs which respect to the principle of prefix-closed.
+#     """
+#     possible_pairs = []
+
+#     # the index from which two words become different
+#     start_index = same_prefix_index(tw1, tw2)
+#     # For the same prefixes, the reset information must be the same
+#     for i in range(start_index):
+#         possible_pairs.append((i, i))
+
+
+#     # find all possible combinations
+#     for i in range(start_index, len(tw1)+1):
+#         for j in range(start_index, len(tw2)+1):
+#             possible_pairs.append((i, j))
+
+#     return tuple(possible_pairs)
+
 def generate_resets_pairs(tw1, tw2):
-    """
-    Return the possible reset pairs which respect to the principle of prefix-closed.
-    """
     possible_pairs = []
-
-    # the index from which two words become different
-    start_index = same_prefix_index(tw1, tw2)
-    # For the same prefixes, the reset information must be the same
-    for i in range(start_index):
-        possible_pairs.append((i, i))
-
-
-    # find all possible combinations
-    for i in range(start_index, len(tw1)+1):
-        for j in range(start_index, len(tw2)+1):
+    for i in range(len(tw1)+1):
+        for j in range(len(tw2)+1):
             possible_pairs.append((i, j))
 
     return tuple(possible_pairs)
@@ -225,7 +233,7 @@ class Learner:
                 self.R[cur_tws] = TestSequence(cur_tws, cur_res)
                 if cur_res != -1:
                     for act in self.actions:
-                        cur_tws_act = tws + (TimedWord(act, 0),)
+                        cur_tws_act = cur_tws + (TimedWord(act, 0),)
                         cur_res_act = self.ota.runTimedWord(cur_tws_act)
                         self.R[cur_tws_act] = TestSequence(cur_tws_act, cur_res_act)
             if cur_res == -1:  # stop when already reached sink
@@ -276,6 +284,8 @@ class Learner:
         """
         formula = []
         for row, r in reset.items():
+            # if self.R[row].is_sink:
+            #     formula.append(z3.BoolVal(True))
             if r:
                 formula.append(resets_var[row])
             else:
@@ -339,7 +349,7 @@ class Learner:
         for tw1 in self.R:
             for tw2 in self.R:
                 # the condition could be more intensive: |t1 - t2| < 1
-                if tw1 != () and tw2 != () and tw1[:-1] == tw2[:-1] and tw1[-1].action and tw2[-1].action\
+                if tw1 != () and tw2 != () and tw1[:-1] == tw2[:-1] and tw1[-1].action == tw2[-1].action\
                         and abs(tw1[-1].time - tw2[-1].time < 1):
                     possible_resets = generate_row_resets_enhance(tw1, tw2)
                     for reset in possible_resets:
@@ -360,9 +370,10 @@ class Learner:
         in the same states, and under the current reset settings these two rows are in
         the same time interval, then their states should also be same."""
         formulas = []
+        new_Es = copy.deepcopy(self.E)
         for tw1 in self.R:
             for tw2 in self.R:
-                if tw1 == (TimedWord('a', 1), TimedWord('b', 3)) and tw2 == (TimedWord('a', 1), TimedWord('b', 3), TimedWord('b', 0)):
+                if tw1 == (TimedWord('b', 1),) and tw2 == (TimedWord('a', 1), TimedWord('b', 1)):
                     print(tw1)
                 if tw1 != () and tw2 != () and tw1[-1].action == tw2[-1].action:
                     possible_resets = generate_row_resets_enhance(tw1, tw2)
@@ -373,13 +384,22 @@ class Learner:
                             if isSameRegion(time_val1+tw1[-1].time, time_val2+tw2[-1].time):
                                 suffix = self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset)
                                 if suffix is not None:
-                                    f = z3.Implies(states_var[tw1[:-1]] == states_var[tw2[:-1]], z3.Not(self.encodeReset(reset, resets_var)))
+                                    f = z3.Implies(states_var[tw1[:-1]] == states_var[tw2[:-1]], z3.Not(self.encodeReset(reset, resets_var))) # cannot contain sink rows' variables
                                     formulas.append(f)
                                     new_E = (TimedWord(tw1[-1].action, min(tw1[-1].time, tw2[-1].time)),) + suffix
-                                    if new_E in self.E:
-                                        raise ValueError
-                                    self.E.append(new_E)
+                                    # Since reset may contain the row which includes the suffix, so we do not check if E contain the new suffix
+                                    # Example: a.json
+                                    # tw1 = ((a,1.0), (b,1.0))
+                                    # tw2 = ((a,1.0), (b,1.0), (a,1.0), (b,2.0))
+                                    # E = [((a,0),), ((b,1.0),), ((b,0),), ((b,1.5),), ((b,1.0), (a,0))]
+                                    # resets = {((a,1.0),): False, ((a,1.0), (b,1.0)): True, ((a,1.0), (b,1.0), (a,1.0)): True, ((a,1.0), (b,1.0), (a,1.0), (b,2.0)): False}
+                                    # Although (b,1.0) is in the suffix, but in reset, ((a,1.0), (b,1.0))'s reset is True, we assume all suffix don't reset, 
+                                    # hence there is a conflict.
 
+                                    if new_E not in new_Es:
+                                        new_Es.append(new_E)
+
+        self.E = new_Es
         if formulas:
             return z3.And(formulas)
         else:
@@ -416,25 +436,32 @@ class Learner:
         constraint2 = self.noForbiddenPair(non_sink_R, states_var, resets_var)
         constraint3 = self.noInvalidRow(states_var, resets_var)
         constraint4 = self.checkConsistency(states_var, resets_var)
+        constraint5 = []
+
+        for r, info in self.R.items():
+            if info.is_sink:
+                constraint5.append(resets_var[r] == True)
+        
+        constraint5 = z3.And(constraint5)
 
         result = "unsat"
         for i in range(1, len(non_sink_R)+1):
-            constraint5 = []
+            constraint6 = []
             for s, row in var_states.items():
                 if self.R[row].is_sink:
-                    constraint5.append(s == i + 1)
+                    constraint6.append(s == i + 1)
                 else:
-                    constraint5.append(z3.And(s>=1, s<=i))
-            constraint5 = z3.And(constraint5)
+                    constraint6.append(z3.And(s>=1, s<=i))
+            constraint6 = z3.And(constraint6)
             s = z3.Solver()
-            s.add(constraint1, constraint2, constraint3, constraint4, constraint5)
+            s.add(constraint1, constraint2, constraint3, constraint4, constraint5, constraint6, states_var[tuple()]==1)
             if str(s.check()) == "sat":
                 result = "sat"
                 break
             else:
                 continue
 
-        if result == "unsat": # why?
+        if result == "unsat":
             return None, None
 
         model = s.model()
@@ -565,8 +592,6 @@ def learn_ota(ota, limit=30, verbose=True):
     assist_ota = buildAssistantOTA(ota)
     for i in range(1, limit):
         print("Step", i)
-        if i == 5:
-            i
         resets, states = learner.findReset()
 
         if verbose:
