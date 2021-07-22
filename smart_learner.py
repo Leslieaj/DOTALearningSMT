@@ -38,26 +38,6 @@ def isPrefix(tw1, tw2):
         if tw1[i] != tw2[i]:
             return False
 
-# def generate_resets_pairs(tw1, tw2):
-#     """
-#     Return the possible reset pairs which respect to the principle of prefix-closed.
-#     """
-#     possible_pairs = []
-
-#     # the index from which two words become different
-#     start_index = same_prefix_index(tw1, tw2)
-#     # For the same prefixes, the reset information must be the same
-#     for i in range(start_index):
-#         possible_pairs.append((i, i))
-
-
-#     # find all possible combinations
-#     for i in range(start_index, len(tw1)+1):
-#         for j in range(start_index, len(tw2)+1):
-#             possible_pairs.append((i, j))
-
-#     return tuple(possible_pairs)
-
 def generate_resets_pairs(tw1, tw2):
     possible_pairs = []
     for i in range(len(tw1)+1):
@@ -284,8 +264,6 @@ class Learner:
         """
         formula = []
         for row, r in reset.items():
-            # if self.R[row].is_sink:
-            #     formula.append(z3.BoolVal(True))
             if r:
                 formula.append(resets_var[row])
             else:
@@ -373,8 +351,6 @@ class Learner:
         new_Es = copy.deepcopy(self.E)
         for tw1 in self.R:
             for tw2 in self.R:
-                if tw1 == (TimedWord('b', 1),) and tw2 == (TimedWord('a', 1), TimedWord('b', 1)):
-                    print(tw1)
                 if tw1 != () and tw2 != () and tw1[-1].action == tw2[-1].action:
                     possible_resets = generate_row_resets_enhance(tw1, tw2)
                     for reset in possible_resets:
@@ -405,6 +381,18 @@ class Learner:
         else:
             return True
 
+    def setSinkRowReset(self, resets_var):
+        """Constraint 5: All sink rows's resets are set to True."""
+        formulas = []
+        for r, info in self.R.items():
+            if info.is_sink:
+                formulas.append(resets_var[r]==True)
+        
+        if formulas:
+            return z3.And(formulas)
+        else:
+            return True
+
     def findReset(self):
         """Find a valid setting of resets and states.
         
@@ -430,19 +418,11 @@ class Learner:
         # state_constraint = [z3.And(s>=1, s<=state_num) for s in states_var]
         # s.add(state_constraint)
 
-        # Constraint 1: if two rows behaves differently under some reset settings, 
-        # then we can conclude that their states are not same.
         constraint1 = self.differentStateUnderReset(states_var, resets_var)
         constraint2 = self.noForbiddenPair(non_sink_R, states_var, resets_var)
         constraint3 = self.noInvalidRow(states_var, resets_var)
-        constraint4 = self.checkConsistency(states_var, resets_var)
-        constraint5 = []
-
-        for r, info in self.R.items():
-            if info.is_sink:
-                constraint5.append(resets_var[r] == True)
-        
-        constraint5 = z3.And(constraint5)
+        constraint4 = self.checkConsistency(states_var, resets_var) 
+        constraint5 = self.setSinkRowReset(resets_var)
 
         result = "unsat"
         for i in range(1, len(non_sink_R)+1):
@@ -465,7 +445,7 @@ class Learner:
             return None, None
 
         model = s.model()
-        print("model", model)
+        # print("model", model)
         resets, states = dict(), dict()
 
         for v in model:
@@ -588,6 +568,7 @@ class Learner:
 
 def learn_ota(ota, limit=30, verbose=True):
     """Overall learning loop."""
+    print("Start to learn ota %s.\n" % ota.name)
     learner = Learner(ota)
     assist_ota = buildAssistantOTA(ota)
     for i in range(1, limit):
@@ -619,3 +600,5 @@ def learn_ota(ota, limit=30, verbose=True):
         if verbose:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
+
+
