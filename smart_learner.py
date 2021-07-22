@@ -426,15 +426,14 @@ class Learner:
         var_states = dict((v, k) for k, v in states_var.items())
         var_resets = dict((v, k) for k, v in resets_var.items())
 
-        # # Limit number of states
-        # state_constraint = [z3.And(s>=1, s<=state_num) for s in states_var]
-        # s.add(state_constraint)
+        constraints = []
 
-        constraint1 = self.differentStateUnderReset(states_var, resets_var)
-        constraint2 = self.noForbiddenPair(non_sink_R, states_var, resets_var)
-        constraint3 = self.noInvalidRow(states_var, resets_var)
-        constraint4 = self.checkConsistency(states_var, resets_var) 
-        constraint5 = self.setSinkRowReset(resets_var)
+        constraints.append(self.differentStateUnderReset(states_var, resets_var))
+        constraints.append(self.noForbiddenPair(non_sink_R, states_var, resets_var))
+        constraints.append(self.noInvalidRow(states_var, resets_var))
+        constraints.append(self.checkConsistency(states_var, resets_var)) 
+        constraints.append(self.setSinkRowReset(resets_var))
+        constraints.append(states_var[tuple()]==1)
 
         result = "unsat"
         for i in range(1, len(non_sink_R)+1):
@@ -446,7 +445,7 @@ class Learner:
                     constraint6.append(z3.And(s>=1, s<=i))
             constraint6 = z3.And(constraint6)
             s = z3.Solver()
-            s.add(constraint1, constraint2, constraint3, constraint4, constraint5, constraint6, states_var[tuple()]==1)
+            s.add(constraints+[constraint6])
             if str(s.check()) == "sat":
                 result = "sat"
                 break
