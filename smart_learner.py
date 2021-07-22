@@ -78,6 +78,7 @@ def generate_row_resets_enhance(tw1, tw2):
     """
     resets = []
     possible_resets = generate_resets_pairs(tw1, tw2)
+
     for i, j in possible_resets:
         reset = dict()
         reset.update(set_row_reset(i, tw1))
@@ -86,9 +87,12 @@ def generate_row_resets_enhance(tw1, tw2):
         _tw1, _tw2 = tw1[:i-1], tw2[:j-1]
         _resets = generate_row_resets(_tw1, _tw2)
         for r in _resets:
-            new_reset = copy.deepcopy(reset)
-            new_reset.update(r)
-            resets.append(new_reset)
+            reset = dict()
+            reset.update(set_row_reset(i, tw1))
+            reset.update(set_row_reset(j, tw2))
+            reset.update(r)
+            resets.append(reset)
+
     return resets
 
 
@@ -348,7 +352,8 @@ class Learner:
         in the same states, and under the current reset settings these two rows are in
         the same time interval, then their states should also be same."""
         formulas = []
-        new_Es = copy.deepcopy(self.E)
+        # new_Es = copy.deepcopy(self.E)
+        new_Es = set()
         for tw1 in self.R:
             for tw2 in self.R:
                 if tw1 != () and tw2 != () and tw1[-1].action == tw2[-1].action:
@@ -372,10 +377,14 @@ class Learner:
                                     # Although (b,1.0) is in the suffix, but in reset, ((a,1.0), (b,1.0))'s reset is True, we assume all suffix don't reset, 
                                     # hence there is a conflict.
 
-                                    if new_E not in new_Es:
-                                        new_Es.append(new_E)
+                                    # if new_E not in new_Es:
+                                    #     new_Es.append(new_E)
+                                    new_Es.add(new_E)
 
-        self.E = new_Es
+        for e in new_Es:
+            if e not in self.E:
+                self.E.append(e)
+        # self.E = new_Es
         if formulas:
             return z3.And(formulas)
         else:
