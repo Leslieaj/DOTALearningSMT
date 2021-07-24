@@ -397,22 +397,22 @@ class Learner:
             if cur_tws not in self.R:
                 self.addRow(cur_tws, cur_res)
                 # keep adding (act, 0) until tw goes to sink
-                current_table = [cur_tws]
-                while len(current_table) > 0:
-                    current_tws = current_table.pop()
-                    for act in self.actions:
-                        node = current_tws + (TimedWord(act, 0),)
-                        node_res = self.ota.runTimedWord(node)
-                        self.addRow(node, node_res)
-                        if node_res != -1:
-                            current_table.append(node)
-                # while cur_res != -1:
+                # current_table = [cur_tws]
+                # while len(current_table) > 0:
+                #     current_tws = current_table.pop()
                 #     for act in self.actions:
-                #         cur_tws_act = cur_tws + (TimedWord(act, 0),)
-                #         cur_res_act = self.ota.runTimedWord(cur_tws_act)
-                #         self.addRow(cur_tws_act, cur_res_act)
+                #         node = current_tws + (TimedWord(act, 0),)
+                #         node_res = self.ota.runTimedWord(node)
+                #         self.addRow(node, node_res)
+                #         if node_res != -1:
+                #             current_table.append(node)
+                while cur_res != -1:
+                    for act in self.actions:
+                        cur_tws_act = cur_tws + (TimedWord(act, 0),)
+                        cur_res_act = self.ota.runTimedWord(cur_tws_act)
+                        self.addRow(cur_tws_act, cur_res_act)
 
-                #     cur_tws, cur_res = cur_tws_act, cur_res_act
+                    cur_tws, cur_res = cur_tws_act, cur_res_act
             if cur_res == -1:  # stop when already reached sink
                 break
 
@@ -485,7 +485,6 @@ class Learner:
             return z3.And(self.constraint1_formula)
         else:
             return True
-
 
     def noForbiddenPair(self, non_sink_row, states_var, resets_var):
         """Constraint 2: for any tow rows R1 + (a, t1) and R2 + (a, t2), 
@@ -754,8 +753,6 @@ def learn_ota(ota, limit=30, verbose=True):
             print(candidate)
         if res:
             print(candidate)
-            fs = [v for _, v in learner.formulas_count.items()]
-            print(len(fs), sum(fs))
             print("Finished in %s steps " % i)
             break
 
