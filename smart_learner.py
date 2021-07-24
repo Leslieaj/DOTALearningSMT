@@ -232,8 +232,11 @@ class Learner:
         # R stores sequences that are internal and at the boundary.
         self.R = dict()
 
-        # Mapping from rows to resets
-        self.resets = dict()
+        # # Mapping from rows to resets
+        # self.resetsA = dict()
+
+        # # Mapping from rows to resets(include backward timed words)
+        # self.resetsB = dict()
 
         # Mapping from rows to states variables
         self.state_name = dict()
@@ -272,6 +275,19 @@ class Learner:
         res += 'E:\n'
         res += '\n'.join(','.join(str(tw) for tw in twE) for twE in self.E)
         return res
+
+    # def generateRowResetA(self, tw):
+    #     possible_resets = []
+    #     for i in range(len(tw)+1):
+    #         f = [self.reset_name[tw[:i]]]
+    #         for j in range(i+1, len(tw)+1):
+    #             f.append(z3.Not(self.reset_name[tw[:j]]))
+    #         if i == 0:
+    #             f = f[1:]
+    #         possible_resets.append(z3.And(f))
+
+        
+    #     self.resetsA[tw] = possible_resets
 
     def addRow(self, tws, res):
         """When adding a new row, complete the corresponding information.
@@ -381,13 +397,22 @@ class Learner:
             if cur_tws not in self.R:
                 self.addRow(cur_tws, cur_res)
                 # keep adding (act, 0) until tw goes to sink
-                while cur_res != -1:
+                current_table = [cur_tws]
+                while len(current_table) > 0:
+                    current_tws = current_table.pop()
                     for act in self.actions:
-                        cur_tws_act = cur_tws + (TimedWord(act, 0),)
-                        cur_res_act = self.ota.runTimedWord(cur_tws_act)
-                        self.addRow(cur_tws_act, cur_res_act)
+                        node = current_tws + (TimedWord(act, 0),)
+                        node_res = self.ota.runTimedWord(node)
+                        self.addRow(node, node_res)
+                        if node_res != -1:
+                            current_table.append(node)
+                # while cur_res != -1:
+                #     for act in self.actions:
+                #         cur_tws_act = cur_tws + (TimedWord(act, 0),)
+                #         cur_res_act = self.ota.runTimedWord(cur_tws_act)
+                #         self.addRow(cur_tws_act, cur_res_act)
 
-                    cur_tws, cur_res = cur_tws_act, cur_res_act
+                #     cur_tws, cur_res = cur_tws_act, cur_res_act
             if cur_res == -1:  # stop when already reached sink
                 break
 
@@ -689,7 +714,6 @@ class Learner:
                 location_objs.add(Location(loc, False, False, True))
             else:
                 location_objs.add(Location(loc, (tw==()), self.R[tw].is_accept, self.R[tw].is_sink))
-        location_objs = list(location_objs)
 
         candidateOTA = OTA(
             name=self.ota.name + '_',
