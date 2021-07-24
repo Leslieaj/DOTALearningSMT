@@ -3,6 +3,9 @@ import unittest
 from ota import buildOTA
 from smart_learner import generate_resets_pairs, learn_ota
 from ota import TimedWord
+from pstats import Stats
+import cProfile
+
 
 class SmartLearnLearnerTest(unittest.TestCase):
     def testGeneratePairs(self):
@@ -26,13 +29,50 @@ class SmartLearnLearnerTest(unittest.TestCase):
 
     def testLearnOTA(self):
         test_cases = [
-            "a", "b", "c", "d", "e", "f", "empty"
+            "a.json",
+            "b.json",
+            "c.json",
+            "d.json",
+            "e.json",
+            "f.json",
+            "empty.json",
+            "3_2_10/3_2_10-1.json",
+            "3_2_10/3_2_10-2.json",
+            "3_2_10/3_2_10-3.json",
+            # "3_2_10/3_2_10-4.json",  # AssertionError: Conflict at 2 (a, 7.0)
+            # "3_2_10/3_2_10-5.json",  # Timeout
+            "3_2_10/3_2_10-6.json",
+            # "3_2_10/3_2_10-7.json",  # Timeout
+            # "3_2_10/3_2_10-8.json",  # Timeout
+            # "3_2_10/3_2_10-9.json",  # AssertionError: Redundant.
+            # "3_2_10/3_2_10-10.json",  # AssertionError: Conflict at 1 (b, 2.5)
+            "4_2_10/4_2_10-1.json",
+            # "4_2_10/4_2_10-2.json",  # Timeout
+            # "4_2_10/4_2_10-3.json",  # Timeout
+            "4_2_10/4_2_10-4.json",
+            "4_2_10/4_2_10-5.json",
+            "4_2_10/4_2_10-6.json",
+            "4_2_10/4_2_10-7.json",
+            "4_2_10/4_2_10-8.json",
+            # "4_2_10/4_2_10-9.json",  # Timeout
+            "4_2_10/4_2_10-10.json",
         ]
 
+        profile = False
+        if profile:
+            pr = cProfile.Profile()
+            pr.enable()
+
         for f in test_cases:
-            o = buildOTA("./examples/%s.json" % f)
+            print("File %s" % f)
+            o = buildOTA("./examples/%s" % f)
             learn_ota(o, limit=30, verbose=False)
 
+        if profile:
+            p = Stats(pr)
+            p.strip_dirs()
+            p.sort_stats('cumtime')
+            p.print_stats()
 
 if __name__ == "__main__":
     unittest.main()
