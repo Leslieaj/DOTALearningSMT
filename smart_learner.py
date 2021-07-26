@@ -1,10 +1,8 @@
 import pprint
-
 from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA
 from interval import Interval
 from equivalence import ota_equivalent
 import copy
-
 import z3
 
 def isSameRegion(t1, t2):
@@ -14,29 +12,6 @@ def isSameRegion(t1, t2):
 
     """
     return t1 == t2 or (int(t1) != t1 and int(t2) != t2 and int(t1) == int(t2))
-
-
-def same_prefix_index(tw1, tw2):
-    """
-    Return the max same prefix index of two timed words. 
-    
-    """
-    start_index = 0
-    for i in range(min(len(tw1), len(tw2))):
-        if tw1[:i+1] == tw2[:i+1]:
-            start_index = i+1
-        else:
-            break
-
-    return start_index
-
-def isPrefix(tw1, tw2):
-    """Determine whether tw1 is a prefix of tw2."""
-    if len(tw1) > len(tw2):
-        return False
-    for i in range(len(tw1)):
-        if tw1[i] != tw2[i]:
-            return False
 
 def generate_resets_pairs(tw1, tw2):
     possible_pairs = []
@@ -170,59 +145,6 @@ class TestSequence:
                 cur_time += tw.time
         return cur_time
 
-
-def findDistinguishingSuffix(ota, info1, info2, resets, E):
-    """Check whether the two timed words are equivalent.
-    
-    If equivalent according to the current E, return None.
-
-    Otherwise, return the distinguishing suffix (which works by shifting
-    the first timed word to align the clock).
-
-    """
-    if info1.is_accept != info2.is_accept or info1.is_sink != info2.is_sink:
-        return tuple()  # empty suffix is distinguishing
-
-    time1 = info1.getTimeVal(resets)
-    time2 = info2.getTimeVal(resets)
-
-    for twE in E:
-        if time1 == time2:
-            res1 = info1.testSuffix(ota, twE)
-            res2 = info2.testSuffix(ota, twE)
-        elif time1 < time2:
-            shift = time2 - time1
-            res1 = info1.testSuffix(ota, twE, shift)
-            res2 = info2.testSuffix(ota, twE)
-        else:  # time1 > time2
-            shift = time1 - time2
-            res1 = info1.testSuffix(ota, twE)
-            res2 = info2.testSuffix(ota, twE, shift)
-        if res1 != res2:
-            return twE
-
-    return None
-
-def encodeReset(reset, resets_var):
-    """Encode the reset information into formula.
-    
-    Note: the formula only contains rows which start from the last reset.
-    Example: suppose a sequence
-    (a, t1, ⊥)(b, t2, ⊥)(c, t3, ⊤)(d, t4, ⊤)
-    then the formula only contains the variables which represent
-    r_3: (a, t1, ⊥)(b, t2, ⊥)(c, t3, ⊤),
-    r_4: (a, t1, ⊥)(b, t2, ⊥)(c, t3, ⊤)(d, t4, ⊤)
-    since (a, t1) and (a, t1)(b, t2) 's reset cannot influence the whole time.
-    """
-    formula = []
-    for row, r in reset.items():
-        if r:
-            formula.append(resets_var[row])
-        else:
-            formula.append(z3.Not(resets_var[row]))
-    assert len(formula) > 0, "Invalid resets!"
-    return z3.And(formula)
-
 class Learner:
     """Represents the state of the learner."""
     def __init__(self, ota):
@@ -232,11 +154,8 @@ class Learner:
         # R stores sequences that are internal and at the boundary.
         self.R = dict()
 
-        # # Mapping from rows to resets
-        # self.resetsA = dict()
-
-        # # Mapping from rows to resets(include backward timed words)
-        # self.resetsB = dict()
+        # S stores sequences which represent different states
+        self.S = dict()
 
         # Mapping from rows to states variables
         self.state_name = dict()
@@ -251,6 +170,11 @@ class Learner:
         self.constraint1_formula = []
         # Store the (tw1, tw2, reset) triple which cannot be distinguished under current suffixes
         self.constraint1_triple = []
+
+        # Store the formulas in constraint 2: 
+        self.constraint2_formula = []
+        # Store the (tw1, tw2, reset) triple which cannot be disti
+        self.constraint2_triple = []
 
         # Store the formulas in constraint4: consistency
         self.constraint4_formula = []
@@ -272,28 +196,22 @@ class Learner:
         res = 'R:\n'
         for twR, info in sorted(self.R.items()):
             res += str(twR) + ': ' + str(info)
+        res += 'S:\n'
+        for twS, info in sorted(self.S.items()):
+            res += str(twS) + ': ' + str(info)
         res += 'E:\n'
         res += '\n'.join(','.join(str(tw) for tw in twE) for twE in self.E)
         return res
-
-    # def generateRowResetA(self, tw):
-    #     possible_resets = []
-    #     for i in range(len(tw)+1):
-    #         f = [self.reset_name[tw[:i]]]
-    #         for j in range(i+1, len(tw)+1):
-    #             f.append(z3.Not(self.reset_name[tw[:j]]))
-    #         if i == 0:
-    #             f = f[1:]
-    #         possible_resets.append(z3.And(f))
-
-        
-    #     self.resetsA[tw] = possible_resets
 
     def addRow(self, tws, res):
         """When adding a new row, complete the corresponding information.
         
         Compare the new row with previous rows, find if there are new formulas on
         constriant1.
+
+        Constraint2
+
+        Constraint4
         """
         self.reset_name[tws] = z3.Bool("r_%d" % len(self))
         self.state_name[tws] = z3.Int("s_%d" % len(self))
@@ -318,10 +236,15 @@ class Learner:
                         time_val1 = self.R[row[:-1]].getTimeVal(reset)
                         time_val2 = self.R[tws[:-1]].getTimeVal(reset)
                         if isSameRegion(time_val1+row[-1].time, time_val2+tws[-1].time):
+                            f = z3.Implies(self.state_name[row[:-1]] == self.state_name[tws[:-1]],
+                                               z3.Not(self.encodeReset(reset, self.reset_name)))
+                            if reset[row] != reset[tws]:
+                                self.constraint2_formula.append(f)
+                                self.constraint2_triple.append((row, tws, reset, f))
                             suffix = self.findDistinguishingSuffix(self.R[row], sequence, reset)
                             if suffix is not None:
-                                f = z3.Implies(self.state_name[row[:-1]] == self.state_name[tws[:-1]],
-                                               z3.Not(self.encodeReset(reset, self.reset_name)))
+                                # f = z3.Implies(self.state_name[row[:-1]] == self.state_name[tws[:-1]],
+                                #                z3.Not(self.encodeReset(reset, self.reset_name)))
                                 self.constraint4_formula.append(f)
                                 # May become different after adding some suffixes
                                 self.constraint4_triple2.append((row, tws, reset, f))
@@ -336,7 +259,12 @@ class Learner:
 
     def addSuffix(self, suffix):
         """When adding a suffix, we can check if some pairs of tws can be distinguished now, new 
-        formulas can be added in constraint1."""
+        formulas can be added in constraint1.
+        
+        Constraint 4:
+
+        Check if row in S could be distinguished from other rows.
+        """
         if suffix in self.E:
             return
 
@@ -352,6 +280,15 @@ class Learner:
             self.constraint1_triple.remove(t)
 
 
+        delete_items = []
+        for tw1, tw2, reset, f in self.constraint2_triple:
+            if self.findDistinguishingSuffix(self.R[tw1[:-1]], self.R[tw2[:-1]], reset, suffix) is not None:
+                self.constraint2_formula.remove(f)
+                delete_items.append((tw1, tw2, reset, f))
+        
+        for t in delete_items:
+            self.constraint2_triple.remove(t)
+        
         if not self.constraint4_triple2:
             return
 
@@ -381,6 +318,40 @@ class Learner:
         for t in delete_items:
             self.constraint4_triple1.remove(t)
 
+        delete_items = []
+        for tw1 in self.R:
+            if tw1 in self.S:
+                continue
+            is_new_state = True
+            for tw2 in self.S:
+                possible_resets = generate_row_resets(tw1, tw2)
+                
+                for reset in possible_resets:
+                    if self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset, suffix) is None:
+                        is_new_state = False
+                
+                if not is_new_state:
+                    break
+
+            if is_new_state:
+                delete_items.append(tw1)
+
+        for tws in delete_items:
+            self.addToS(tws)
+
+    def addToS(self, tws):
+        assert tws in self.R and tws not in self.S, \
+                "addToS: tws should be in R and not in S"
+        self.S[tws] = self.R[tws]
+        # del self.R[tws]
+
+        if self.ota.runTimedWord(tws) != -1:
+            for act in self.actions:
+                cur_tws = tws + (TimedWord(act, 0),)
+                if cur_tws not in self.R:
+                    cur_res = self.ota.runTimedWord(cur_tws)
+                    self.addRow(cur_tws, cur_res)
+
     def addPath(self, tws):
         """Add the given path tws (and its prefixes) to R.
         
@@ -389,32 +360,30 @@ class Learner:
 
         """
         tws = tuple(tws)
-        assert tws not in self.R, "Redundant."
         for i in range(len(tws)+1):
             cur_tws = tws[:i]
-
             cur_res = self.ota.runTimedWord(cur_tws)
             if cur_tws not in self.R:
-                self.addRow(cur_tws, cur_res)
-                # keep adding (act, 0) until tw goes to sink
-                # current_table = [cur_tws]
-                # while len(current_table) > 0:
-                #     current_tws = current_table.pop()
-                #     for act in self.actions:
-                #         node = current_tws + (TimedWord(act, 0),)
-                #         node_res = self.ota.runTimedWord(node)
-                #         self.addRow(node, node_res)
-                #         if node_res != -1:
-                #             current_table.append(node)
-                while cur_res != -1:
-                    for act in self.actions:
-                        cur_tws_act = cur_tws + (TimedWord(act, 0),)
-                        cur_res_act = self.ota.runTimedWord(cur_tws_act)
-                        self.addRow(cur_tws_act, cur_res_act)
+                self.addRow(cur_tws, cur_res)            
+                is_new_state = self.checkNewState(cur_tws, cur_res)
 
-                    cur_tws, cur_res = cur_tws_act, cur_res_act
-            if cur_res == -1:  # stop when already reached sink
+                if is_new_state:
+                    self.addToS(tws)
+
+            if cur_res == -1:
                 break
+
+    def checkNewState(self, tws, res):
+        """Check if tw is different from any other rows in S."""
+        sequence = TestSequence(tws, res)
+        for row in self.S:
+            if row != tws:
+                resets = generate_row_resets(row, tws)
+                for reset in resets:
+                    if self.findDistinguishingSuffix(self.R[row], sequence, reset) is None:
+                        return False
+            
+        return True
 
     def findDistinguishingSuffix(self, info1, info2, resets, E=None):
         """Check whether the two timed words are equivalent.
@@ -491,25 +460,10 @@ class Learner:
         if states[R1] = states[R2], and they are in the same time interval,
         if the two rows are at same states, then they should have same reset settings.        
         """
-        formula = []
-        for tw1 in non_sink_row:
-            for tw2 in non_sink_row:
-                if tw1 != () and tw2 != () and tw1[-1].action == tw2[-1].action:
-                    possible_resets = generate_row_resets_enhance(tw1, tw2)
-                    for reset in possible_resets:
-                        if self.findDistinguishingSuffix(non_sink_row[tw1], non_sink_row[tw2], reset) is None: # maybe in the same states
-                            time_val1 = non_sink_row[tw1[:-1]].getTimeVal(reset)
-                            time_val2 = non_sink_row[tw1[:-1]].getTimeVal(reset)
-                            if isSameRegion(time_val1+tw1[-1].time, time_val2+tw2[-1].time) and \
-                                reset[tw1] != reset[tw2]:
-                                f = z3.Implies(states_var[tw1] == states_var[tw2], z3.Not(self.encodeReset(reset, resets_var)))
-                                formula.append(f)
-
-        if formula:
-            return z3.And(formula)
+        if self.constraint2_formula:
+            return z3.And(self.constraint2_formula)
         else:
             return True
-        # return formula
 
     def noInvalidRow(self, states_var, resets_var):
         """Constraint 3: for any two rows R + (a, t1), R + (a, t2), if they are
@@ -567,12 +521,6 @@ class Learner:
         non_sink_R = dict((twR, infoR) for twR, infoR in self.R.items()
                           if not infoR.is_sink)
 
-        # # Give each row a state variable and a reset variable
-        # states_var, resets_var = dict(), dict()
-
-        # for i, row in enumerate(self.R):
-        #     states_var[row] = z3.Int("s_%d" % (i+1))
-        #     resets_var[row] = z3.Bool("r_%d" % (i+1))
         states_var, resets_var = self.state_name, self.reset_name
 
         var_states = dict((v, k) for k, v in states_var.items())
@@ -580,7 +528,6 @@ class Learner:
 
         constraint1 = self.differentStateUnderReset(states_var, resets_var)
         constraint2 = self.noForbiddenPair(non_sink_R, states_var, resets_var)
-        # constraint3 = self.noInvalidRow(states_var, resets_var)
         constraint4 = self.checkConsistency(states_var, resets_var)
         constraint5 = self.setSinkRowReset(resets_var)
 
@@ -739,7 +686,7 @@ def learn_ota(ota, limit=30, verbose=True):
             print(learner)
 
         if resets is None:
-            # No possible choice of resets with the current S.
+            # No possible choice of resets with the current R.
             raise NotImplementedError
 
         if verbose:
@@ -760,5 +707,3 @@ def learn_ota(ota, limit=30, verbose=True):
         if verbose:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
-
-
