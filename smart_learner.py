@@ -323,7 +323,7 @@ class Learner:
             if tw1 in self.S:
                 continue
             is_new_state = True
-            for tw2 in self.S:
+            for tw2 in list(self.S.keys())+delete_items:
                 possible_resets = generate_row_resets(tw1, tw2)
                 
                 for reset in possible_resets:
@@ -337,7 +337,8 @@ class Learner:
                 delete_items.append(tw1)
 
         for tws in delete_items:
-            self.addToS(tws)
+            if tws not in self.S:
+                self.addToS(tws)
 
     def addToS(self, tws):
         assert tws in self.R and tws not in self.S, \
@@ -349,8 +350,7 @@ class Learner:
             for act in self.actions:
                 cur_tws = tws + (TimedWord(act, 0),)
                 if cur_tws not in self.R:
-                    cur_res = self.ota.runTimedWord(cur_tws)
-                    self.addRow(cur_tws, cur_res)
+                    self.addPath(cur_tws)
 
     def addPath(self, tws):
         """Add the given path tws (and its prefixes) to R.
@@ -367,8 +367,8 @@ class Learner:
                 self.addRow(cur_tws, cur_res)            
                 is_new_state = self.checkNewState(cur_tws, cur_res)
 
-                if is_new_state:
-                    self.addToS(tws)
+                if is_new_state and cur_tws not in self.S and cur_res != -1:
+                    self.addToS(cur_tws)
 
             if cur_res == -1:
                 break
@@ -627,6 +627,10 @@ class Learner:
             for action, trans in transitions[source].items():
                 # Sort and remove duplicates
                 trans = sorted((time, reset, target) for time, (reset, target) in trans.items())
+                if len(trans) == 0: # invalid transition!
+                    for tw, pos in states.items():
+                        if pos == source:
+                            return False, tw
                 trans_new = [trans[0]]
                 for i in range(1, len(trans)):
                     time, reset, target = trans[i]
@@ -670,7 +674,7 @@ class Learner:
             accept_states=accepts,
             sink_name=states['sink'])
 
-        return candidateOTA
+        return True, candidateOTA
 
 
 def learn_ota(ota, limit=30, verbose=True):
@@ -694,7 +698,10 @@ def learn_ota(ota, limit=30, verbose=True):
             for tws, v in resets.items():
                 print("  %s: %s %s" % (",".join(str(tw) for tw in tws), v, states[tws]))
 
-        candidate = learner.buildCandidateOTA(resets, states)
+        f, candidate = learner.buildCandidateOTA(resets, states)
+        if not f:
+            learner.addToS(candidate)
+            continue
         res, ctx = ota_equivalent(10, assist_ota, candidate)
         if not res and verbose:
             print(candidate)

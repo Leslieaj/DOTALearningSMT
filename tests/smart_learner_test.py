@@ -39,23 +39,43 @@ class SmartLearnLearnerTest(unittest.TestCase):
             "3_2_10/3_2_10-1.json",
             "3_2_10/3_2_10-2.json",
             "3_2_10/3_2_10-3.json",
-            # "3_2_10/3_2_10-4.json",  # AssertionError: Conflict at 2 (a, 7.0)
-            # "3_2_10/3_2_10-5.json",  # Timeout
+            "3_2_10/3_2_10-4.json",
+            "3_2_10/3_2_10-5.json",
             "3_2_10/3_2_10-6.json",
-            # "3_2_10/3_2_10-7.json",  # Timeout
-            # "3_2_10/3_2_10-8.json",  # Timeout
-            # "3_2_10/3_2_10-9.json",  # AssertionError: Redundant.
-            # "3_2_10/3_2_10-10.json",  # AssertionError: Conflict at 1 (b, 2.5)
+            "3_2_10/3_2_10-7.json",
+            "3_2_10/3_2_10-8.json",
+            "3_2_10/3_2_10-9.json",
+            "3_2_10/3_2_10-10.json",
             "4_2_10/4_2_10-1.json",
-            # "4_2_10/4_2_10-2.json",  # Timeout
-            # "4_2_10/4_2_10-3.json",  # Timeout
+            "4_2_10/4_2_10-2.json",
+            "4_2_10/4_2_10-3.json",
             "4_2_10/4_2_10-4.json",
             "4_2_10/4_2_10-5.json",
             "4_2_10/4_2_10-6.json",
             "4_2_10/4_2_10-7.json",
             "4_2_10/4_2_10-8.json",
-            # "4_2_10/4_2_10-9.json",  # Timeout
+            # "4_2_10/4_2_10-9.json", # Too much steps
             "4_2_10/4_2_10-10.json",
+            "5_2_10/5_2_10-1.json",
+            "5_2_10/5_2_10-2.json",
+            "5_2_10/5_2_10-3.json",
+            "5_2_10/5_2_10-4.json",
+            "5_2_10/5_2_10-5.json",
+            "5_2_10/5_2_10-6.json",
+            "5_2_10/5_2_10-7.json",
+            "5_2_10/5_2_10-8.json",
+            # "5_2_10/5_2_10-9.json", # Too much steps
+            # "5_2_10/5_2_10-10.json", # Too much steps
+            "6_2_10/6_2_10-1.json",
+            "6_2_10/6_2_10-2.json",
+            # "6_2_10/6_2_10-3.json", # Too much steps
+            "6_2_10/6_2_10-4.json",
+            "6_2_10/6_2_10-5.json",
+            "6_2_10/6_2_10-6.json",
+            "6_2_10/6_2_10-7.json",
+            "6_2_10/6_2_10-8.json",
+            # "6_2_10/6_2_10-9.json", # Too much steps
+            # "6_2_10/6_2_10-10.json", # Too much steps
         ]
 
         profile = False
@@ -66,7 +86,7 @@ class SmartLearnLearnerTest(unittest.TestCase):
         for f in test_cases:
             print("File %s" % f)
             o = buildOTA("./examples/%s" % f)
-            learn_ota(o, limit=30, verbose=False)
+            learn_ota(o, limit=100, verbose=False)
 
         if profile:
             p = Stats(pr)
