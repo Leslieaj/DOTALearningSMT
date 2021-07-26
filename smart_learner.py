@@ -703,7 +703,7 @@ def learn_ota(ota, limit=30, verbose=True):
         if not f:
             learner.addToS(candidate)
             continue
-        res, ctx = ota_equivalent(10, assist_ota, candidate)
+        res, ctx = ota_equivalent(20, assist_ota, candidate)
         if not res and verbose:
             print(candidate)
         if res:
