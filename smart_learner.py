@@ -360,6 +360,7 @@ class Learner:
 
         """
         tws = tuple(tws)
+        assert tws not in self.R, "Redundant R: %s" % str(tws)
         for i in range(len(tws)+1):
             cur_tws = tws[:i]
             cur_res = self.ota.runTimedWord(cur_tws)
