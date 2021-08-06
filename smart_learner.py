@@ -177,11 +177,14 @@ class Learner:
         self.constraint2_triple = []
 
         # Store the formulas in constraint4: consistency
-        self.constraint4_formula = []
+        self.constraint4_formula1 = []
+        self.constraint4_formula2 = []
         # Store the (tw1, tw2, reset) triple in which both tw1[:-1] == tw2[:-1] and tw1 == tw2
         self.constraint4_triple1 = []
         # Store the (tw1, tw2, reset) triple in which tw1[:-1] == tw2[-1]
         self.constraint4_triple2 = []
+        # Store the (tw1, tw2, reset, f) triple in which records resets for tw1[:-1] == tw2[:-1]
+        self.constraint4_triple3 = []
 
         self.addPath(())
 
@@ -243,14 +246,16 @@ class Learner:
                                 self.constraint2_triple.append((row, tws, reset, f))
                             suffix = self.findDistinguishingSuffix(self.R[row], sequence, reset)
                             if suffix is not None:
-                                # f = z3.Implies(self.state_name[row[:-1]] == self.state_name[tws[:-1]],
-                                #                z3.Not(self.encodeReset(reset, self.reset_name)))
-                                self.constraint4_formula.append(f)
+                                self.constraint4_formula1.append(f)
                                 # May become different after adding some suffixes
                                 self.constraint4_triple2.append((row, tws, reset, f))
                                 suffix = (TimedWord(row[-1].action, min(row[-1].time, tws[-1].time)),) + suffix
                                 new_Es.append(suffix)
                             else:
+                                f2 = z3.Implies(z3.And(self.state_name[row[:-1]] == self.state_name[tws[:-1]], self.encodeReset(reset, self.reset_name)),
+                                            self.state_name[row] == self.state_name[tws])
+                                self.constraint4_formula2.append(f2)
+                                self.constraint4_triple3.append((row, tws, reset, f2))
                                 self.constraint4_triple1.append((row, tws, reset))
 
         self.R[tws] = TestSequence(tws, res)
@@ -295,7 +300,7 @@ class Learner:
         delete_items = []
         for tw1, tw2, reset, f in self.constraint4_triple2:
             if self.findDistinguishingSuffix(self.R[tw1[:-1]], self.R[tw2[:-1]], reset, suffix) is not None:
-                self.constraint4_formula.remove(f)
+                self.constraint4_formula1.remove(f)
                 delete_items.append((tw1, tw2, reset, f))
 
         for t in delete_items:
@@ -311,12 +316,21 @@ class Learner:
                     if s is not None:
                         f = z3.Implies(self.state_name[tw1[:-1]] == self.state_name[tw2[:-1]],
                                                z3.Not(self.encodeReset(reset, self.reset_name)))
-                        self.constraint4_formula.append(f)                        
+                        self.constraint4_formula1.append(f)                        
                         self.constraint4_triple2.append((tw1, tw2, reset, f))
                         delete_items.append((tw1, tw2, reset))
 
         for t in delete_items:
             self.constraint4_triple1.remove(t)
+
+        delete_items = []
+        for tw1, tw2, reset, f in self.constraint4_triple3:
+            if self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset, suffix) is not None:
+                self.constraint4_formula2.remove(f)
+                delete_items.append((tw1, tw2, reset, f))
+
+        for t in delete_items:
+            self.constraint4_triple3.remove(t)
 
         delete_items = []
         for tw1 in self.R:
@@ -337,7 +351,7 @@ class Learner:
                 delete_items.append(tw1)
 
         for tws in delete_items:
-            if tws not in self.S:
+            if tws not in self.S and self.ota.runTimedWord(tws) != -1:
                 self.addToS(tws)
 
     def addToS(self, tws):
@@ -494,8 +508,12 @@ class Learner:
         """Constraint 4: for any two rows R1 + (a, t1), R2 + (a, t2). If R1 and R2 are
         in the same states, and under the current reset settings these two rows are in
         the same time interval, then their states should also be same."""
-        if len(self.constraint4_formula) > 0:
-            return z3.And(self.constraint4_formula)
+        formulas = self.constraint4_formula1 + self.constraint4_formula2
+        
+        if len(self.constraint4_formula1) > 0:
+            return z3.And(formulas)
+        # if len(self.constraint4_formula1) > 0:
+        #     return z3.And(self.constraint4_formula1)
         else:
             return True
 
@@ -510,6 +528,16 @@ class Learner:
             return z3.And(formulas)
         else:
             return True
+
+    def encodeSRow(self, states_var):
+        """Each row in S should have a unique state."""
+        formulas = []
+        i = 1
+        for s in self.S:
+            formulas.append(states_var[s] == i)
+            i += 1
+        
+        return z3.And(formulas)
 
     def findReset(self):
         """Find a valid setting of resets and states.
@@ -531,9 +559,11 @@ class Learner:
         constraint2 = self.noForbiddenPair(non_sink_R, states_var, resets_var)
         constraint4 = self.checkConsistency(states_var, resets_var)
         constraint5 = self.setSinkRowReset(resets_var)
+        constraint7 = self.encodeSRow(states_var)
 
         result = "unsat"
-        for i in range(1, len(non_sink_R)+1):
+        minimum_states_num = len(self.S)
+        for i in range(minimum_states_num, len(non_sink_R)+1):
             constraint6 = []
             for s, row in var_states.items():
                 if self.R[row].is_sink:
@@ -542,13 +572,12 @@ class Learner:
                     constraint6.append(z3.And(s>=1, s<=i))
             constraint6 = z3.And(constraint6)
             s = z3.Solver()
-            s.add(constraint1, constraint2, constraint4, constraint5, constraint6, states_var[tuple()]==1)
+            s.add(constraint1, constraint2, constraint4, constraint5, constraint6, constraint7, states_var[tuple()]==1)
             if str(s.check()) == "sat":
                 result = "sat"
                 break
             else:
                 continue
-
         if result == "unsat":
             return None, None
 
@@ -677,12 +706,22 @@ class Learner:
 
         return True, candidateOTA
 
+def compute_max_time(candidate):
+    def parse_time(t):
+        return 0 if t == "+" else int(t)
+    max_time = 0
+    for tran in candidate.trans:
+        max_time = max(max_time, 
+                    parse_time(tran.constraint.min_value), 
+                    parse_time(tran.constraint.max_value))
+    return max_time
 
 def learn_ota(ota, limit=30, verbose=True):
     """Overall learning loop."""
     print("Start to learn ota %s.\n" % ota.name)
     learner = Learner(ota)
     assist_ota = buildAssistantOTA(ota)
+    max_time_ota = compute_max_time(ota)
     for i in range(1, limit):
         print("Step", i)
         resets, states = learner.findReset()
@@ -703,7 +742,9 @@ def learn_ota(ota, limit=30, verbose=True):
         if not f:
             learner.addToS(candidate)
             continue
-        res, ctx = ota_equivalent(20, assist_ota, candidate)
+        max_time_candidate = compute_max_time(candidate)
+        max_time = max(max_time_ota, max_time_candidate)
+        res, ctx = ota_equivalent(max_time, assist_ota, candidate)
         if not res and verbose:
             print(candidate)
         if res:
