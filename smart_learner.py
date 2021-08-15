@@ -1,9 +1,10 @@
 import pprint
-from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA
+from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA, OTAToJSON
 from interval import Interval
 from equivalence import ota_equivalent
 import copy
 import z3
+import time
 
 def isSameRegion(t1, t2):
     """Check whether t1 and t2 lies in the same region. That is,
@@ -191,6 +192,8 @@ class Learner:
         # Count the number of occurrence
         self.formulas_count = dict()
 
+        # Store the query result
+        self.query_result = dict()
 
     def __len__(self):
         return len(self.R)
@@ -351,7 +354,8 @@ class Learner:
                 delete_items.append(tw1)
 
         for tws in delete_items:
-            if tws not in self.S and self.ota.runTimedWord(tws) != -1:
+            res = self.ota.runTimedWord(tws)
+            if self.checkNewState(tws, res) and self.ota.runTimedWord(tws) != -1:
                 self.addToS(tws)
 
     def addToS(self, tws):
@@ -365,6 +369,21 @@ class Learner:
                 cur_tws = tws + (TimedWord(act, 0),)
                 if cur_tws not in self.R:
                     self.addPath(cur_tws)
+
+    def addPossibleS(self, tws):
+        """Check if tws can be added into S, if not, 
+        add tws + (act, 0) for each action into R.
+        """
+        res = self.ota.runTimedWord(tws)
+        if self.checkNewState(tws, res):
+            self.addToS(tws)
+        else:
+            for act in self.actions:
+                new_tws = tws + (TimedWord(act, 0),)
+                new_res = self.ota.runTimedWord(new_tws)
+                if new_tws not in self.R:
+                    self.addRow(new_tws, new_res)              
+
 
     def addPath(self, tws):
         """Add the given path tws (and its prefixes) to R.
@@ -388,10 +407,15 @@ class Learner:
             if cur_res == -1:
                 break
 
-    def checkNewState(self, tws, res):
+    def checkNewState(self, tws, res, flag=False):
         """Check if tw is different from any other rows in S."""
+        if tws in self.S:
+            return False
+        
         sequence = TestSequence(tws, res)
         for row in self.S:
+            if flag and row == tws:
+                continue
             if row != tws:
                 resets = generate_row_resets(row, tws)
                 for reset in resets:
@@ -563,6 +587,7 @@ class Learner:
 
         result = "unsat"
         minimum_states_num = len(self.S)
+        # time1 = time.perf_counter()
         for i in range(minimum_states_num, len(non_sink_R)+1):
             constraint6 = []
             for s, row in var_states.items():
@@ -578,6 +603,8 @@ class Learner:
                 break
             else:
                 continue
+
+        # print("z3", time.perf_counter() - time1)
         if result == "unsat":
             return None, None
 
@@ -693,7 +720,8 @@ class Learner:
             if tw == "sink":
                 location_objs.add(Location(loc, False, False, True))
             else:
-                location_objs.add(Location(loc, (tw==()), self.R[tw].is_accept, self.R[tw].is_sink))
+                # location_objs.add(Location(loc, (tw==()), self.R[tw].is_accept, self.R[tw].is_sink))
+                location_objs.add(Location(loc, (loc=="1"), self.R[tw].is_accept, self.R[tw].is_sink))
 
         candidateOTA = OTA(
             name=self.ota.name + '_',
@@ -740,16 +768,20 @@ def learn_ota(ota, limit=30, verbose=True):
 
         f, candidate = learner.buildCandidateOTA(resets, states)
         if not f:
-            learner.addToS(candidate)
+            learner.addPossibleS(candidate)
             continue
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
+        time1 = time.perf_counter()
+        # print("max_time", max_time)
         res, ctx = ota_equivalent(max_time, assist_ota, candidate)
+        # print("equivalence", time.perf_counter() - time1)
         if not res and verbose:
             print(candidate)
         if res:
             print(candidate)
             print("Finished in %s steps " % i)
+            # OTAToJSON(candidate, "candidate")
             break
 
         ctx_path = ctx.find_path(assist_ota, candidate)
