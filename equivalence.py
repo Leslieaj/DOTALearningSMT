@@ -125,7 +125,7 @@ class Letterword:
     def delay_seq(self, max_time_value):
         """Find the sequence of delays starting from a letterword."""
         current_lw = self
-        results = []
+        results = [Letterword(self.lst, self.frac_times, self, Decimal(0))]
         increment = Decimal(0)
         while not current_lw.is_all_inf():
             next_lw, next_increment = current_lw.delay_one(max_time_value)
