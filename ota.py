@@ -17,6 +17,12 @@ class Location:
     def __str__(self):
         return self.name + ',' + str(self.init) + ',' + str(self.accept) + ',' + str(self.sink)
 
+    def __eq__(self, other):
+        return self.name == other.name and self.init == other.init and \
+            self.accept == other.accept and self.sink == other.sink
+
+    def __hash__(self):
+        return hash((self.name, self.init, self.accept, self.sink))
 
 class TimedWord:
     """Timed word without reset information."""
@@ -109,6 +115,9 @@ class OTA:
         self.accept_states = accept_states
         self.sink_name = sink_name
 
+        # store the runTimedWord result
+        self.query = dict()
+
     def __str__(self):
         res = ""
         
@@ -121,8 +130,8 @@ class OTA:
             res += str(l) + "\n"
         res += "transitions (id, source_state, label, target_state, constraints, reset):\n"
         for t in self.trans:
-            if t.target != self.sink_name:
-                res += "%s %s %s %s %s\n" % (t.source, t.action, t.target, t.constraint, t.reset)
+            # if t.target != self.sink_name:
+            res += "%s %s %s %s %s\n" % (t.source, t.action, t.target, t.constraint, t.reset)
         res += "init state:\n"
         res += str(self.init_state) + "\n"
         res += "accept states:\n"
@@ -142,6 +151,8 @@ class OTA:
         TODO: we currently only implement the deterministic case.
 
         """
+        if tws in self.query:
+            return self.query[tws]
         cur_state, cur_time = self.init_state, 0
         for tw in tws:
             moved = False
@@ -155,15 +166,46 @@ class OTA:
                     moved = True
                     break
             if not moved:
+                self.query[tws] = -1
                 return -1  # assume to go to sink
 
-        if self.sink_name is not None and cur_state == self.sink_name:
-            return -1
+        if self.sink_name is not None and cur_state == self.sink_name:            
+            result = -1
         elif cur_state in self.accept_states:
-            return 1
+            result = 1
         else:
-            return 0
+            result = 0
 
+        self.query[tws] = result
+        return result
+
+
+def OTAToJSON(ota, file_name):
+    """Convert an OTA to a json file."""
+    index_trans = {}
+    if file_name is None:
+        file_name = ota.name
+    i = 0
+    for tr in ota.trans:
+        reset = "r" if tr.reset else "n"
+        index_trans[str(i)] = [
+            str(tr.source), str(tr.action), str(tr.constraint), str(reset), str(tr.target)
+        ]
+        i += 1
+
+    ota_json = {
+        "name": file_name,
+        "sigma": [str(i) for i in ota.sigma],
+        "accept": [str(i) for i in ota.accept_states],
+        "init": str(ota.init_state),
+        "l": [str(i.name) for i in ota.locations],
+        "tran": index_trans
+    }
+
+    with open('./compare/%s.json' % file_name, 'w', encoding="utf-8") as f:
+        json.dump(ota_json, f, indent=4)
+        
+    
 
 def buildOTA(jsonfile):
     """Build the teacher OTA from a json file."""
