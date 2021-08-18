@@ -782,7 +782,8 @@ def learn_ota(ota, limit=30, verbose=True):
             print(candidate)
             print("Finished in %s steps " % i)
             # OTAToJSON(candidate, "candidate")
-            break
+            # break
+            return candidate
 
         ctx_path = ctx.find_path(assist_ota, candidate)
         if verbose:

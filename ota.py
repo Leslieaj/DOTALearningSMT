@@ -1,7 +1,7 @@
 # Nondeterministic one-clock timed automata
 
 import json
-
+from graphviz import Digraph
 from interval import Interval, complement_intervals
 
 
@@ -205,7 +205,28 @@ def OTAToJSON(ota, file_name):
     with open('./compare/%s.json' % file_name, 'w', encoding="utf-8") as f:
         json.dump(ota_json, f, indent=4)
         
-    
+def OTAToDOT(ota, file_name, keep_sink_location=False):
+    """Convert an OTA to a dot file which can be used to draw by grahviz."""
+    dot = Digraph()
+    for location in ota.locations:
+        if location.sink == True and keep_sink_location == False:
+            continue
+        if location.accept == True:
+            dot.node(name=location.name, label=location.name, shape='doublecircle')
+        else:
+            dot.node(name=location.name, label=location.name)
+    for tran in ota.trans:
+        is_tran_contain_sink = False
+        if tran.source == ota.sink_name or tran.target == ota.sink_name:
+            is_tran_contain_sink = True
+        if is_tran_contain_sink == True and keep_sink_location == False:
+            continue
+        tranLabel = " " + tran.action + " " + str(tran.constraint) + " " + str(tran.reset)
+        dot.edge(tran.source, tran.target, tranLabel)
+
+    # with open('./dot/%s.dot' % file_name, 'w', encoding="utf-8") as f:
+    #     f.write(dot.source)
+    dot.render('./dot/%s.dot' % file_name, format="png", view=True)
 
 def buildOTA(jsonfile):
     """Build the teacher OTA from a json file."""

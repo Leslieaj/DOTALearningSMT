@@ -97,7 +97,7 @@ class SmartLearnLearnerTest(unittest.TestCase):
         for f in test_cases:
             print("File %s" % f)
             o = buildOTA("./examples/%s" % f)
-            learn_ota(o, limit=100, verbose=False)
+            learnt_ota = learn_ota(o, limit=100, verbose=False)
 
         if profile:
             p = Stats(pr)
