@@ -19,8 +19,8 @@ def smt_learn_dota():
     end_time = time.time()
     print("Total time of learning: %s ." % str(end_time - start_time))
 
-    OTAToDOT(o, o.name)
-    OTAToDOT(learnt_ota, learnt_ota.name+"result")
+    # OTAToDOT(o, o.name)
+    # OTAToDOT(learnt_ota, learnt_ota.name+"result")
 
     if profile:
         p = Stats(pr)

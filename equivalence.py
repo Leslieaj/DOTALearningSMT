@@ -294,11 +294,39 @@ def init_letterword(ota_A, ota_B):
     return Letterword([{Letter('A', ota_A.init_state, point_region(0)),
                         Letter('B', ota_B.init_state, point_region(0))}], [0])
 
-def explored_dominated(explored, w):
+def explored_dominated(explored, w, ota_A, ota_B):
+    if both_reach_sink(w, ota_A, ota_B) == True:
+        return True
     for v in explored:
         if v.can_dominate(w):
             return True
     return False
+
+def both_reach_sink(lw, ota_A, ota_B):
+    """Determine whether both letters in letterword lw have reached A's and B's sink location respectively.
+        Now, we just consider deterministic OTA, so every lw just contains 2 letter, one is for A and the other is for B.
+    """
+    letter1 = None
+    letter2 = None
+    if len(lw.lst) == 1:
+        # print(lw.lst)
+        letter1, letter2 = list(lw.lst[0])
+    if len(lw.lst) == 2:
+        assert len(list(lw.lst[0])) == 1 and len(list(lw.lst[1])) == 1
+        letter1 = list(lw.lst[0])[0]
+        letter2 = list(lw.lst[1])[0]
+    if letter1.side == 'A' and letter2.side == 'B': 
+        if letter1.location == ota_A.sink_name and letter2.location == ota_B.sink_name:
+            return True
+        else:
+            return False
+    elif letter1.side == 'B' and letter2.side == 'A':
+        if letter1.location == ota_B.sink_name and letter2.location == ota_A.sink_name:
+            return True
+        else:
+            return False
+    else:
+        raise NotImplementedError("The format of letterword in function both_reach_sink")
 
 def ota_inclusion(max_time_value, ota_A, ota_B):
     """Determines the inclusion L(B) <= L(A).
@@ -319,7 +347,7 @@ def ota_inclusion(max_time_value, ota_A, ota_B):
         if w.is_bad(ota_A, ota_B):
             return False, w  # return counterexample
 
-        while explored_dominated(explored, w):
+        while explored_dominated(explored, w, ota_A, ota_B):
             if len(to_explore) == 0:
                 return True, None
             w = to_explore[0]
@@ -327,9 +355,13 @@ def ota_inclusion(max_time_value, ota_A, ota_B):
             if w.is_bad(ota_A, ota_B):
                 return False, w
 
+        # if both_reach_sink(w, ota_A, ota_B) == True:
+        #     #print("both reach sink")
+        #     continue
+
         wsucc = w.compute_wsucc(max_time_value, ota_A, ota_B)
         for nw in wsucc:
-            if nw not in to_explore:
+            if nw not in to_explore and both_reach_sink(nw, ota_A, ota_B) == False:
                 to_explore.append(nw)
         if w not in explored:
             explored.append(w)

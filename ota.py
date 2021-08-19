@@ -223,7 +223,9 @@ def OTAToDOT(ota, file_name, keep_sink_location=False):
             continue
         tranLabel = " " + tran.action + " " + str(tran.constraint) + " " + str(tran.reset)
         dot.edge(tran.source, tran.target, tranLabel)
-
+    # add a arrow to initial location
+    dot.node(name="start", label="", shape='none')
+    dot.edge("start", ota.init_state, "")
     # with open('./dot/%s.dot' % file_name, 'w', encoding="utf-8") as f:
     #     f.write(dot.source)
     dot.render('./dot/%s.dot' % file_name, format="png", view=True)
