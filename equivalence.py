@@ -295,8 +295,8 @@ def init_letterword(ota_A, ota_B):
                         Letter('B', ota_B.init_state, point_region(0))}], [0])
 
 def explored_dominated(explored, w, ota_A, ota_B):
-    if both_reach_sink(w, ota_A, ota_B) == True:
-        return True
+    # if both_reach_sink(w, ota_A, ota_B) == True:
+    #     return True
     for v in explored:
         if v.can_dominate(w):
             return True
@@ -361,7 +361,8 @@ def ota_inclusion(max_time_value, ota_A, ota_B):
 
         wsucc = w.compute_wsucc(max_time_value, ota_A, ota_B)
         for nw in wsucc:
-            if nw not in to_explore and both_reach_sink(nw, ota_A, ota_B) == False:
+            if nw not in to_explore:
+            # if nw not in to_explore and both_reach_sink(nw, ota_A, ota_B) == False:
                 to_explore.append(nw)
         if w not in explored:
             explored.append(w)
