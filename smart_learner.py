@@ -157,6 +157,7 @@ class Learner:
 
         # S stores sequences which represent different states
         self.S = dict()
+        self.real_S = dict()
 
         # Mapping from rows to states variables
         self.state_name = dict()
@@ -357,6 +358,8 @@ class Learner:
             res = self.ota.runTimedWord(tws)
             if self.checkNewState(tws, res) and self.ota.runTimedWord(tws) != -1:
                 self.addToS(tws)
+                if tws in self.real_S:
+                    del self.real_S[tws]
 
     def addToS(self, tws):
         assert tws in self.R and tws not in self.S, \
@@ -375,6 +378,7 @@ class Learner:
         add tws + (act, 0) for each action into R.
         """
         res = self.ota.runTimedWord(tws)
+        # self.real_S[tws] = TestSequence(tws, res)
         if self.checkNewState(tws, res):
             self.addToS(tws)
         else:
@@ -560,6 +564,10 @@ class Learner:
         for s in self.S:
             formulas.append(states_var[s] == i)
             i += 1
+
+        for s in self.real_S:
+            formulas.append(states_var[s] == i)
+            i += 1
         
         return z3.And(formulas)
 
@@ -586,7 +594,7 @@ class Learner:
         constraint7 = self.encodeSRow(states_var)
 
         result = "unsat"
-        minimum_states_num = len(self.S)
+        minimum_states_num = len(self.S)+len(self.real_S)
         # time1 = time.perf_counter()
         for i in range(minimum_states_num, len(non_sink_R)+1):
             constraint6 = []
