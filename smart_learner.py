@@ -359,7 +359,7 @@ class Learner:
             if self.checkNewState(tws, res) and self.ota.runTimedWord(tws) != -1:
                 self.addToS(tws)
                 if tws in self.real_S:
-                    del self.real_S[tws]
+                    del self.real_S[tws]  
 
     def addToS(self, tws):
         assert tws in self.R and tws not in self.S, \
@@ -776,6 +776,7 @@ def learn_ota(ota, limit=30, verbose=True):
 
         f, candidate = learner.buildCandidateOTA(resets, states)
         if not f:
+            print("candidate")
             learner.addPossibleS(candidate)
             continue
         max_time_candidate = compute_max_time(candidate)
@@ -793,7 +794,7 @@ def learn_ota(ota, limit=30, verbose=True):
             # break
             return candidate
 
-        ctx_path = ctx.find_path(assist_ota, candidate)
+        ctx_path = tuple(ctx.find_path(assist_ota, candidate))
         if verbose:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
