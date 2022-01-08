@@ -265,6 +265,7 @@ class Learner:
                             if reset[row] != reset[tws]:
                                 self.constraint2_formula.append(f)
                                 self.constraint2_triple.append((row, tws, reset, f))
+                                continue
 
                             suffix = self.findDistinguishingSuffix(self.R[row], sequence, reset)
                             # If row[:-1] and tws[:-1] are not distinguishable by the current suffixes,
@@ -822,6 +823,7 @@ def learn_ota(ota, limit=30, verbose=True):
             print("candidate")
             learner.addPossibleS(candidate)
             continue
+        learner.real_S.clear()
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
         time1 = time.perf_counter()
