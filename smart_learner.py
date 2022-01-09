@@ -324,29 +324,6 @@ class Learner:
         for t in delete_items:
             self.constraint1_triple.remove(t)
 
-        # Remove unnecessary formulas from constraint2.
-        delete_items = []
-        for tw1, tw2, reset, f in self.constraint2_triple:
-            if self.findDistinguishingSuffix(self.R[tw1[:-1]], self.R[tw2[:-1]], reset, suffix) is not None:
-                self.constraint2_formula.remove(f)
-                delete_items.append((tw1, tw2, reset, f))
-        
-        for t in delete_items:
-            self.constraint2_triple.remove(t)
-
-        # Remove unnecessary formulas from constraint4_formula1.
-        if not self.constraint4_triple2:
-            return
-
-        delete_items = []
-        for tw1, tw2, reset, f in self.constraint4_triple2:
-            if self.findDistinguishingSuffix(self.R[tw1[:-1]], self.R[tw2[:-1]], reset, suffix) is not None:
-                self.constraint4_formula1.remove(f)
-                delete_items.append((tw1, tw2, reset, f))
-
-        for t in delete_items:
-            self.constraint4_triple2.remove(t)
-
         # Re-test condition for adding to constraint4_formula1. Should add to new_Es?
         delete_items = []
         for tw1, tw2, reset in self.constraint4_triple1:
@@ -364,16 +341,6 @@ class Learner:
 
         for t in delete_items:
             self.constraint4_triple1.remove(t)
-
-        # Remove unnecessary formulas from constraint4_formula2.
-        delete_items = []
-        for tw1, tw2, reset, f in self.constraint4_triple3:
-            if self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset, suffix) is not None:
-                self.constraint4_formula2.remove(f)
-                delete_items.append((tw1, tw2, reset, f))
-
-        for t in delete_items:
-            self.constraint4_triple3.remove(t)
 
         # Check if some state in R can be added to S. A state in R can be
         # added to S if it is different from all existing rows in S under
