@@ -241,14 +241,18 @@ class Learner:
         # resets, add the corresponding constraint1. Otherwise, record the
         # inability to distinguish to constraint1_triple.
         for row in self.R:
-            possible_resets = generate_row_resets(row, tws)
-            for reset in possible_resets:
-                if self.findDistinguishingSuffix(self.R[row], sequence, reset) is not None:
-                    f = z3.Implies(self.encodeReset(reset, self.reset_name),
-                                   self.state_name[row] != self.state_name[tws])
-                    self.constraint1_formula.append(f)
+            if not sequence.is_sink and not self.R[row].is_sink:
+                if sequence.is_accept != self.R[row].is_accept:
+                    self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
                 else:
-                    self.constraint1_triple.append((row, tws, reset))
+                    possible_resets = generate_row_resets(row, tws)
+                    for reset in possible_resets:
+                        if self.findDistinguishingSuffix(self.R[row], sequence, reset) is not None:
+                            f = z3.Implies(self.encodeReset(reset, self.reset_name),
+                                        self.state_name[row] != self.state_name[tws])
+                            self.constraint1_formula.append(f)
+                        else:
+                            self.constraint1_triple.append((row, tws, reset))
 
         new_Es = []
         for row in self.R:
@@ -293,8 +297,8 @@ class Learner:
                                 self.constraint4_triple3.append((row, tws, reset, f2))
                                 self.constraint4_triple1.append((row, tws, reset))
 
-        # Add the new timed word to R.
-        self.R[tws] = TestSequence(tws, res)
+        # Add a new timed word to R.
+        self.R[tws] = sequence
 
         # Add each new suffix.
         for e in new_Es:
@@ -365,8 +369,7 @@ class Learner:
 
         # Add state from R into S.
         for tws in delete_items:
-            res = self.ota.runTimedWord(tws)
-            if self.checkNewState(tws, res) and self.ota.runTimedWord(tws) != -1:
+            if self.checkNewState(tws) and self.ota.runTimedWord(tws) != -1:
                 self.addToS(tws)
 
     def addToS(self, tws):
@@ -389,8 +392,7 @@ class Learner:
         tws + (act, 0) for each action into R.
         
         """
-        res = self.ota.runTimedWord(tws)
-        if self.checkNewState(tws, res):
+        if self.checkNewState(tws):
             # Distinct from all states in S, directly add to S
             self.addToS(tws)
         else:
@@ -416,7 +418,7 @@ class Learner:
             cur_res = self.ota.runTimedWord(cur_tws)
             if cur_tws not in self.R:
                 self.addRow(cur_tws, cur_res)            
-                is_new_state = self.checkNewState(cur_tws, cur_res)
+                is_new_state = self.checkNewState(cur_tws)
 
                 if is_new_state and cur_tws not in self.S and cur_res != -1:
                     self.addToS(cur_tws)
@@ -424,15 +426,13 @@ class Learner:
             if cur_res == -1:
                 break
 
-    def checkNewState(self, tws, res, flag=False):
+    def checkNewState(self, tws):
         """Check if tw is different from any other rows in S."""
         if tws in self.S:
             return False
         
-        sequence = TestSequence(tws, res)
+        sequence = self.R[tws]
         for row in self.S:
-            if flag and row == tws:
-                continue
             if row != tws:
                 resets = generate_row_resets(row, tws)
                 for reset in resets:
@@ -584,6 +584,7 @@ class Learner:
         else:
             constraint8 = []
         s = z3.Solver()
+        print("%d %d %d\n" % (len(constraint1), len(constraint2), len(constraint4)))
         s.add(*(constraint1 + constraint2 + constraint4 + constraint5 + constraint6 + constraint7 + constraint8))
 
         if str(s.check()) == "unsat":
@@ -694,7 +695,6 @@ class Learner:
             if tw == "sink":
                 location_objs.add(Location(loc, False, False, True))
             else:
-                # location_objs.add(Location(loc, (tw==()), self.R[tw].is_accept, self.R[tw].is_sink))
                 location_objs.add(Location(loc, (loc=="1"), self.R[tw].is_accept, self.R[tw].is_sink))
 
         candidateOTA = OTA(
@@ -740,8 +740,9 @@ def learn_ota(ota, limit=30, verbose=True):
             state_num = len(learner.S)
             print("Adjust state_num to len(S) = %s" % state_num)
 
-        print("#S = %d, #extra_S = %d, state_num = %d" % (
-            len(learner.S), len(learner.extra_S), state_num
+        print("#S = %d, #extra_S = %d, state_num = %d, #R = %d, #R (no sink) = %d" % (
+            len(learner.S), len(learner.extra_S), state_num, len(learner.R),
+            len([row for row, s in learner.R.items() if not s.is_sink])
         ))
 
         # First, try with current state_num and enforce the constraint
