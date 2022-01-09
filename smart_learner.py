@@ -410,7 +410,6 @@ class Learner:
         assert tws in self.R and tws not in self.S, \
                 "addToS: tws should be in R and not in S"
         self.S[tws] = self.R[tws]
-        # del self.R[tws]
 
         if self.ota.runTimedWord(tws) != -1:
             for act in self.actions:
@@ -555,22 +554,20 @@ class Learner:
         """
         return self.constraint4_formula1 + self.constraint4_formula2
 
-    def setSinkRowReset(self, resets_var):
+    def setSinkRowReset(self):
         """Constraint 5: All sink rows's resets are set to True."""
         formulas = []
         for r, info in self.R.items():
             if info.is_sink:
-                formulas.append(resets_var[r]==True)
+                formulas.append(self.reset_name[r] == True)
 
         return formulas
 
-    def encodeSRow(self, states_var):
+    def encodeSRow(self):
         """Each row in S should have a unique state."""
         formulas = []
-        i = 1
-        for s in self.S:
-            formulas.append(states_var[s] == i)
-            i += 1
+        for i, s in enumerate(self.S):
+            formulas.append(self.state_name[s] == (i + 1))
 
         return formulas
 
@@ -607,16 +604,11 @@ class Learner:
         Return a tuple (resets, states). 
 
         """
-        states_var, resets_var = self.state_name, self.reset_name
-
-        var_states = dict((v, k) for k, v in states_var.items())
-        var_resets = dict((v, k) for k, v in resets_var.items())
-
         constraint1 = self.differentStateUnderReset()
         constraint2 = self.noForbiddenPair()
         constraint4 = self.checkConsistency()
-        constraint5 = self.setSinkRowReset(resets_var)
-        constraint7 = self.encodeSRow(states_var)
+        constraint5 = self.setSinkRowReset()
+        constraint7 = self.encodeSRow()
 
         assert state_num >= len(self.S)
         constraint6 = self.encodeStateNum(state_num)
@@ -635,18 +627,9 @@ class Learner:
         model = s.model()
         resets, states = dict(), dict()
 
-        for v in model:
-            if isinstance(model[v], z3.ArithRef):
-                states[var_states[z3.Int(str(v))]] = str(model[v])
-            elif isinstance(model[v], z3.BoolRef):
-                resets[var_resets[z3.Bool(str(v))]] = bool(model[v])
-            else:
-                raise NotImplementedError
-
-        # set all reset variables to True which do not exist in constraints
-        for v, row in var_resets.items():
-            if row not in resets:
-                resets[row] = True
+        for row in self.R:
+            states[row] = str(model[self.state_name[row]])
+            resets[row] = bool(model[self.reset_name[row]])
 
         states["sink"] = str(state_num + 1)
 
