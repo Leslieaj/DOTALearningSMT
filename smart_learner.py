@@ -537,10 +537,7 @@ class Learner:
         cannot be mapped to the same state.
 
         """
-        if len(self.constraint1_formula) > 0:
-            return z3.And(self.constraint1_formula)
-        else:
-            return True
+        return self.constraint1_formula
 
     def noForbiddenPair(self):
         """Constraint 2: for any tow rows R1 + (a, t1) and R2 + (a, t2), 
@@ -548,10 +545,7 @@ class Learner:
         then they should have same reset settings.
 
         """
-        if self.constraint2_formula:
-            return z3.And(self.constraint2_formula)
-        else:
-            return True
+        return self.constraint2_formula
 
     def checkConsistency(self):
         """Constraint 4: for any two rows R1 + (a, t1), R2 + (a, t2). If R1 and R2 are
@@ -559,12 +553,7 @@ class Learner:
         the same time interval, then their states should also be same.
         
         """
-        formulas = self.constraint4_formula1 + self.constraint4_formula2
-        
-        if len(formulas) > 0:
-            return z3.And(formulas)
-        else:
-            return True
+        return self.constraint4_formula1 + self.constraint4_formula2
 
     def setSinkRowReset(self, resets_var):
         """Constraint 5: All sink rows's resets are set to True."""
@@ -573,10 +562,7 @@ class Learner:
             if info.is_sink:
                 formulas.append(resets_var[r]==True)
 
-        if formulas:
-            return z3.And(formulas)
-        else:
-            return True
+        return formulas
 
     def encodeSRow(self, states_var):
         """Each row in S should have a unique state."""
@@ -585,29 +571,31 @@ class Learner:
         for s in self.S:
             formulas.append(states_var[s] == i)
             i += 1
-        
-        return z3.And(formulas)
+
+        return formulas
 
     def encodeStateNum(self, state_num):
         """The state name of each row must be between 1 and state_num, except the
         sink states, which must have state_num equal to state_num + 1.
         
         """
-        constraints = []
+        formulas = []
         for row, s in self.state_name.items():
             if self.R[row].is_sink:
-                constraints.append(s == state_num + 1)
+                formulas.append(s == state_num + 1)
             else:
-                constraints.append(s >= 1)
-                constraints.append(s <= state_num)
-        return z3.And(constraints)
+                formulas.append(s >= 1)
+                formulas.append(s <= state_num)
+
+        return formulas
 
     def encodeExtraS(self, state_num):
         """The states in extra_S must cover all remaining state_num."""
-        constraints = []
+        formulas = []
         for i in range(len(self.S)+1, state_num+1):
-            constraints.append(z3.Or(*(self.state_name[row] == i for row in self.extra_S)))
-        return z3.And(constraints)
+            formulas.append(z3.Or(*(self.state_name[row] == i for row in self.extra_S)))
+
+        return formulas
 
     def findReset(self, state_num, enforce_extra):
         """Find a valid setting of resets and states.
@@ -635,9 +623,9 @@ class Learner:
         if enforce_extra:
             constraint8 = self.encodeExtraS(state_num)
         else:
-            constraint8 = z3.And([])
+            constraint8 = []
         s = z3.Solver()
-        s.add(constraint1, constraint2, constraint4, constraint5, constraint6, constraint7, constraint8)
+        s.add(*(constraint1 + constraint2 + constraint4 + constraint5 + constraint6 + constraint7 + constraint8))
 
         if str(s.check()) == "unsat":
             # No assignment can be found for current S, extra_S, and state_num
