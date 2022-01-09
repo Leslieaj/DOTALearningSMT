@@ -15,9 +15,9 @@ def smt_learn_dota():
     print("File %s" % f)
     o = buildOTA("./examples/%s" % f)
     start_time = time.time()
-    learnt_ota = learn_ota(o, limit=100, verbose=False)
+    _ = learn_ota(o, limit=100, verbose=False)
     end_time = time.time()
-    print("Total time of learning: %s ." % str(end_time - start_time))
+    print("Total time of learning: %s." % str(end_time - start_time))
 
     # OTAToDOT(o, o.name)
     # OTAToDOT(learnt_ota, learnt_ota.name+"result")

@@ -165,6 +165,10 @@ class Learner:
         # S stores sequences which represent different states
         self.S = dict()
 
+        # extra_S stores those rows that are not guaranteed to be different
+        # from S, but are needed as representatives for some resets.
+        self.extra_S = dict()
+
         # Mapping from rows to states variables
         self.state_name = dict()
 
@@ -421,8 +425,11 @@ class Learner:
         """
         res = self.ota.runTimedWord(tws)
         if self.checkNewState(tws, res):
+            # Distinct from all states in S, directly add to S
             self.addToS(tws)
         else:
+            # Otherwise, add to extra_S
+            self.extra_S[tws] = self.R[tws]
             for act in self.actions:
                 new_tws = tws + (TimedWord(act, 0),)
                 new_res = self.ota.runTimedWord(new_tws)
@@ -546,32 +553,6 @@ class Learner:
         else:
             return True
 
-    def noInvalidRow(self, states_var, resets_var):
-        """Constraint 3: for any two rows R + (a, t1), R + (a, t2), if they are
-        in the same time interval, we must ensure that they go into the same state.
-
-        Currently not used. 
-        """
-        formulas = []
-        for tw1 in self.R:
-            for tw2 in self.R:
-                # the condition could be more intensive: |t1 - t2| < 1
-                if tw1 != () and tw2 != () and tw1[:-1] == tw2[:-1] and tw1[-1].action == tw2[-1].action\
-                        and abs(tw1[-1].time - tw2[-1].time < 1):
-                    possible_resets = generate_row_resets_enhance(tw1, tw2)
-                    for reset in possible_resets:
-                        if self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset) is not None:
-                            time_val1 = self.R[tw1[:-1]].getTimeVal(reset)
-                            time_val2 = self.R[tw2[:-1]].getTimeVal(reset)
-                            if isSameRegion(time_val1+tw1[-1].time, time_val2+tw2[-1].time):
-                                f = self.encodeReset(reset, resets_var)
-                                formulas.append(z3.Not(f))
-
-        if formulas:
-            return z3.And(formulas)
-        else:
-            return True
-
     def checkConsistency(self):
         """Constraint 4: for any two rows R1 + (a, t1), R2 + (a, t2). If R1 and R2 are
         in the same states, and under the current reset settings these two rows are in
@@ -580,7 +561,7 @@ class Learner:
         """
         formulas = self.constraint4_formula1 + self.constraint4_formula2
         
-        if len(self.constraint4_formula1) > 0:  # why not self.constraint4_formula2?
+        if len(formulas) > 0:
             return z3.And(formulas)
         else:
             return True
@@ -607,16 +588,37 @@ class Learner:
         
         return z3.And(formulas)
 
-    def findReset(self):
+    def encodeStateNum(self, state_num):
+        """The state name of each row must be between 1 and state_num, except the
+        sink states, which must have state_num equal to state_num + 1.
+        
+        """
+        constraints = []
+        for row, s in self.state_name.items():
+            if self.R[row].is_sink:
+                constraints.append(s == state_num + 1)
+            else:
+                constraints.append(s >= 1)
+                constraints.append(s <= state_num)
+        return z3.And(constraints)
+
+    def encodeExtraS(self, state_num):
+        """The states in extra_S must cover all remaining state_num."""
+        constraints = []
+        for i in range(len(self.S)+1, state_num+1):
+            constraints.append(z3.Or(*(self.state_name[row] == i for row in self.extra_S)))
+        return z3.And(constraints)
+
+    def findReset(self, state_num, enforce_extra):
         """Find a valid setting of resets and states.
         
+        state_num - number of locations in the automata.
+        enforce_extra - whether to enforce the condition that all rows have a
+            representative in S or extra_S.
+            
         Return a tuple (resets, states). 
 
         """
-        # find non_sink rows
-        non_sink_R = dict((twR, infoR) for twR, infoR in self.R.items()
-                          if not infoR.is_sink)
-
         states_var, resets_var = self.state_name, self.reset_name
 
         var_states = dict((v, k) for k, v in states_var.items())
@@ -628,31 +630,21 @@ class Learner:
         constraint5 = self.setSinkRowReset(resets_var)
         constraint7 = self.encodeSRow(states_var)
 
-        result = "unsat"
-        minimum_states_num = len(self.S)
-        # time1 = time.perf_counter()
-        for i in range(minimum_states_num, len(non_sink_R)+1):
-            constraint6 = []
-            for s, row in var_states.items():
-                if self.R[row].is_sink:
-                    constraint6.append(s == i + 1)
-                else:
-                    constraint6.append(z3.And(s>=1, s<=i))
-            constraint6 = z3.And(constraint6)
-            s = z3.Solver()
-            s.add(constraint1, constraint2, constraint4, constraint5, constraint6, constraint7, states_var[tuple()]==1)
-            if str(s.check()) == "sat":
-                result = "sat"
-                break
-            else:
-                continue
+        assert state_num >= len(self.S)
+        constraint6 = self.encodeStateNum(state_num)
+        if enforce_extra:
+            constraint8 = self.encodeExtraS(state_num)
+        else:
+            constraint8 = z3.And([])
+        s = z3.Solver()
+        s.add(constraint1, constraint2, constraint4, constraint5, constraint6, constraint7, constraint8)
 
-        # print("z3", time.perf_counter() - time1)
-        if result == "unsat":
+        if str(s.check()) == "unsat":
+            # No assignment can be found for current S, extra_S, and state_num
             return None, None
 
+        # An assignment is found, construct resets and states from the model.
         model = s.model()
-        # print("model", model)
         resets, states = dict(), dict()
 
         for v in model:
@@ -668,7 +660,7 @@ class Learner:
             if row not in resets:
                 resets[row] = True
 
-        states["sink"] = str(i + 1)
+        states["sink"] = str(state_num + 1)
 
         return resets, states
 
@@ -789,21 +781,73 @@ def compute_max_time(candidate):
     return max_time
 
 def learn_ota(ota, limit=30, verbose=True):
-    """Overall learning loop."""
+    """Overall learning loop.
+    
+    limit - maximum number of steps.
+    verbose - whether to print debug information.
+
+    """
     print("Start to learn ota %s.\n" % ota.name)
     learner = Learner(ota)
     assist_ota = buildAssistantOTA(ota)
     max_time_ota = compute_max_time(ota)
-    for i in range(1, limit):
-        print("Step", i)
-        resets, states = learner.findReset()
+    state_num = 1
+
+    for step in range(1, limit):
+        print("Step", step)
+
+        # If size of S has increased beyond state_num, adjust state_num to
+        # that size.
+        if state_num < len(learner.S):
+            state_num = len(learner.S)
+            print("Adjust state_num to len(S) = %s" % state_num)
+
+        print("#S = %d, #extra_S = %d, state_num = %d" % (
+            len(learner.S), len(learner.extra_S), state_num
+        ))
+
+        # First, try with current state_num and enforce the constraint
+        # that all representatives are in extra_S.
+        resets, states = learner.findReset(state_num, True)
+
+        # If fails, try again without the constraint that all representatives
+        # are in extra_S. Add any new representative to extra_S.
+        if resets is None:
+            resets, states = learner.findReset(state_num, False)
+
+            # If still not found, must increase state_num.
+            if resets is None:
+                state_num += 1
+                print("Increment state_num to %s." % state_num)
+                continue
+
+            # Otherwise, add new representatives to extra_S.
+            has_reps = dict()
+            for i in range(1, state_num+1):
+                has_reps[i] = False
+            for row in learner.S:
+                has_reps[int(states[row])] = True
+            for row in learner.extra_S:
+                has_reps[int(states[row])] = True
+
+            new_reps = []
+            for row in learner.R:
+                if int(states[row]) <= state_num and not has_reps[int(states[row])]:
+                    has_reps[int(states[row])] = True
+                    new_reps.append(row)
+            assert len(new_reps) > 0
+
+            for rep in new_reps:
+                print("Add %s to extra_S." % str(rep))
+                learner.addPossibleS(rep)
+            continue
 
         if verbose:
             print(learner)
 
         if resets is None:
-            # No possible choice of resets with the current R.
-            raise NotImplementedError
+            # Should not arrive here
+            raise AssertionError
 
         if verbose:
             print("resets and states:")
@@ -812,20 +856,17 @@ def learn_ota(ota, limit=30, verbose=True):
 
         f, candidate = learner.buildCandidateOTA(resets, states)
         if not f:
-            print("candidate")
-            learner.addPossibleS(candidate)
-            continue
+            raise AssertionError("buildCandidateOTA failed.")
+
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
-        time1 = time.perf_counter()
-        # print("max_time", max_time)
         res, ctx = ota_equivalent(max_time, assist_ota, candidate)
-        # print("equivalence", time.perf_counter() - time1)
+
         if not res and verbose:
             print(candidate)
         if res:
             print(candidate)
-            print("Finished in %s steps " % i)
+            print("Finished in %s steps " % step)
             # OTAToJSON(candidate, "candidate")
             # break
             return candidate
