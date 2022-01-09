@@ -38,6 +38,16 @@ def set_row_reset(index, tw):
             reset[tw[:t]] = False
     return reset
 
+def generate_row_reset(tw1, tw2, i, j):
+    """Given a pair of timed words, as well as last reset positions,
+    return the corresponding reset information.
+    
+    """
+    reset = dict()
+    reset.update(set_row_reset(i, tw1))
+    reset.update(set_row_reset(j, tw2))
+    return reset
+
 def generate_row_resets(tw1, tw2):
     """Given a pair of timed words, iterate over all choices of last
     reset, and collect together the corresponding reset information.
@@ -122,21 +132,6 @@ class TestSequence:
             self.info[tws2] = ota.runTimedWord(tws)
 
         return self.info[tws2]
-
-    def allTimeVals(self):
-        """Return the set of possible values of the clock at the end of tws.
-
-        This considers all possible values of resets. Starting from
-        the end, find all possible sums of suffixes.
-
-        """
-        vals = {0}
-        cur_time = 0
-        for tw in reversed(self.tws):
-            if tw.time > 0:
-                cur_time += tw.time
-                vals.add(cur_time)
-        return vals
 
     def getTimeVal(self, resets):
         """Given a choice of resets, find the value of time at the end.
@@ -245,14 +240,23 @@ class Learner:
                 if sequence.is_accept != self.R[row].is_accept:
                     self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
                 else:
-                    possible_resets = generate_row_resets(row, tws)
-                    for reset in possible_resets:
-                        if self.findDistinguishingSuffix(self.R[row], sequence, reset) is not None:
-                            f = z3.Implies(self.encodeReset(reset, self.reset_name),
-                                        self.state_name[row] != self.state_name[tws])
-                            self.constraint1_formula.append(f)
-                        else:
-                            self.constraint1_triple.append((row, tws, reset))
+                    pairs = generate_resets_pairs(row, tws)
+                    test_res = dict()
+                    for i, j in pairs:
+                        reset = generate_row_reset(row, tws, i, j)
+                        test_res[(i, j)] = (self.findDistinguishingSuffix(self.R[row], sequence, reset) is not None)
+
+                    if all(res for _, res in test_res.items()):
+                        self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
+                    else:
+                        for (i, j), res in test_res.items():
+                            reset = generate_row_reset(row, tws, i, j)
+                            if res:
+                                f = z3.Implies(self.encodeReset(reset, self.reset_name),
+                                               self.state_name[row] != self.state_name[tws])
+                                self.constraint1_formula.append(f)
+                            else:
+                                self.constraint1_triple.append((row, tws, reset))
 
         new_Es = []
         for row in self.R:
