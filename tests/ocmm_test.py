@@ -1,18 +1,17 @@
 import unittest
 import sys
 sys.path.append("./")
-sys.path.append("..")
 from ocmm import IOTimedWord, buildOCMM
 
 class OCMMTest(unittest.TestCase):
     def testBuildOCMM(self):
-        ocmm = buildOCMM('../examples/MMT/OCMMs/Light.json')
+        ocmm = buildOCMM('./examples/MMT/OCMMs/Light.json')
         # assist_ota = buildOCMM(ocmm)
         print(ocmm)
         # print(assist_ota)
 
     def testRunIOTimedWord(self):
-        ocmm = buildOCMM('../examples/MMT/OCMMs/Light.json')
+        ocmm = buildOCMM('./examples/MMT/OCMMs/Light.json')
         # assist_ota = buildAssistantOTA(ota)
         test_data = [
             ([], 1),

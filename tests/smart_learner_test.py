@@ -1,5 +1,6 @@
 import unittest
-
+import sys
+sys.path.append("./")
 from ota import buildOTA
 from smart_learner import learn_ota, generate_pair
 from ota import TimedWord
