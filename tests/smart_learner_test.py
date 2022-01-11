@@ -1,7 +1,7 @@
 import unittest
 
 from ota import buildOTA
-from smart_learner import generate_resets_pairs, learn_ota, generate_pair
+from smart_learner import learn_ota, generate_pair
 from ota import TimedWord
 from pstats import Stats
 import cProfile
@@ -23,25 +23,6 @@ class SmartLearnerTest(unittest.TestCase):
             res = generate_pair(t1, t2)
             self.assertEqual(len(res), len(pairs))
             self.assertEqual(set(res), set(pairs))
-
-    def testGeneratePairs(self):
-        test_cases = [
-            [(TimedWord('a', 0.5),), (TimedWord('a', 0.5),), 
-            ((0, 0), (0, 1), (1, 0), (1, 1))],
-            [(TimedWord('a', 1.5),), (TimedWord('a', 1),), 
-            ((0, 0), (0, 1), (1, 0), (1, 1))],
-            [(TimedWord('a', 1), TimedWord('a', 2)),(TimedWord('a', 1), TimedWord('a', 2)),
-            ((0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2))],
-            [(TimedWord('a', 1), TimedWord('a', 2)), (TimedWord('a', 1), TimedWord('a', 1.5)),
-            ((0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1), (2, 2))],
-            [(TimedWord('a', 1), TimedWord('a', 2)), (TimedWord('a', 1),),
-            ((0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1))],
-            [(TimedWord('a', 1), TimedWord('a', 2)), (TimedWord('b', 1),),
-            ((0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1))],
-        ]
-
-        for tw1, tw2, result in test_cases:
-            self.assertEqual(generate_resets_pairs(tw1, tw2), result)
 
     def testLearnOTA(self):
         test_cases = [
@@ -125,7 +106,7 @@ class SmartLearnerTest(unittest.TestCase):
             pr = cProfile.Profile()
             pr.enable()
 
-        with open("output", "w") as output_file:
+        with open("output3.txt", "w") as output_file:
             for f in test_cases:
                 print("file name: %s", f)
                 o = buildOTA("./examples/%s" % f)
