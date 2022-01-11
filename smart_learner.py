@@ -68,6 +68,15 @@ def generate_reset_rows(t1, t2):
         
     return resets
 
+def generate_reset_at_i(t, i):
+    reset = dict()
+    reset[t[:i+1]] = True
+    for k in range(i+1, len(t)):
+        reset[t[:k+1]] = False
+    if tuple() in reset:
+        del reset[tuple()]
+    return reset
+
 def generate_reset_at_ij(t1, t2, i, j):
     reset = dict()
     reset[t1[:i+1]] = True
@@ -307,13 +316,51 @@ class Learner:
                 else:
                     pairs = generate_pair(row, tws)
                     test_res = dict()
+                    test_row = dict()
+                    test_col = dict()
                     for i, j in pairs:
                         reset = generate_reset_at_ij(row, tws, i, j)
-                        test_res[(i, j)] = (self.findDistinguishingSuffix(self.R[row], sequence, reset) is not None)
-
+                        res = (self.findDistinguishingSuffix(self.R[row], sequence, reset) is not None)
+                        if i not in test_row:
+                            test_row[i] = {j : res}
+                        else:
+                            test_row[i][j] = res
+                        if j not in test_col:
+                            test_col[j] = {i: res}
+                        else:
+                            test_col[j][i] = res
+                        test_res[(i, j)] = res
                     if all(res for _, res in test_res.items()):
                         self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
                     else:
+                        # If all j can be distinguished by a specific i
+                        spec_row, spec_col = [], []
+                        for i in test_row:
+                            if all(res for _, res in test_row[i].items()):
+                                row_i_reset = generate_reset_at_i(row, i)
+                                row_f = z3.Implies(self.encodeReset(row_i_reset, self.reset_name),
+                                                self.state_name[row] != self.state_name[tws])
+                                self.constraint1_formula.append(row_f)
+                                # spec_row.append(self.encodeReset(row_i_reset, self.reset_name))
+
+                                # Delete used pairs
+                                for ii, jj in list(test_res.keys()):
+                                    if i == ii:
+                                        del test_res[(ii, jj)]
+                            # self.constraint1_formula.append(z3.Implies(z3.Or(spec_row),
+                                                        # self.state_name[row] != self.state_name[tws]))
+                        for j in test_col:
+                            if all(res for _, res in test_col[j].items()):
+                                col_j_reset = generate_reset_at_i(tws, j)
+                                col_f = z3.Implies(self.encodeReset(col_j_reset, self.reset_name),
+                                                self.state_name[row] != self.state_name[tws])
+                                self.constraint1_formula.append(col_f)
+                                # spec_col.append(self.encodeReset(col_j_reset, self.reset_name))
+                                for ii, jj in list(test_res.keys()):
+                                    if j == jj:
+                                        del test_res[(ii, jj)]
+                            # self.constraint1_formula.append(z3.Implies(z3.Or(spec_col),
+                            #                             self.state_name[row] != self.state_name[tws]))
                         for (i, j), res in test_res.items():
                             reset = generate_reset_at_ij(row, tws, i, j)
                             if res:
