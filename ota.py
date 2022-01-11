@@ -15,7 +15,10 @@ class Location:
         self.sink = sink
 
     def __str__(self):
-        return self.name + ',' + str(self.init) + ',' + str(self.accept) + ',' + str(self.sink)
+        return self.name
+
+    def __repr__(self):
+        return self.name
 
     def __eq__(self, other):
         return self.name == other.name and self.init == other.init and \
@@ -114,6 +117,15 @@ class OTA:
         self.init_state = init_state
         self.accept_states = accept_states
         self.sink_name = sink_name
+
+        # Create index of transitions
+        self.trans_dict = dict()
+        for action in self.sigma:
+            for loc in self.locations:
+                self.trans_dict[(action, loc.name)] = []
+
+        for tran in self.trans:
+            self.trans_dict[(tran.action, tran.source)].append(tran)
 
         # store the runTimedWord result
         self.query = dict()

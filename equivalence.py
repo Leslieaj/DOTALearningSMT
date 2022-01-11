@@ -230,17 +230,15 @@ class Letterword:
             for i, letter_set in enumerate(self.lst):
                 for letter in letter_set:
                     if letter.side == 'A':
-                        for tran in ota_A.trans:
-                            if tran.action == action and tran.source == letter.location and \
-                                tran.constraint.contains_interval(letter.region):
+                        for tran in ota_A.trans_dict[(action, letter.location)]:
+                            if tran.constraint.contains_interval(letter.region):
                                 if tran.reset:
                                     A_reset_list.append(Letter('A', tran.target, zero_point_region))
                                 else:
                                     A_noreset_list[i].append(Letter('A', tran.target, letter.region))
                     else:  # letter.side == 'B'
-                        for tran in ota_B.trans:
-                            if tran.action == action and tran.source == letter.location and \
-                                tran.constraint.contains_interval(letter.region):
+                        for tran in ota_B.trans_dict[(action, letter.location)]:
+                            if tran.constraint.contains_interval(letter.region):
                                 if tran.reset:
                                     B_reset_list.append(Letter('B', tran.target, zero_point_region))
                                 else:
