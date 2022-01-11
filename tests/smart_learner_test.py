@@ -1,14 +1,29 @@
 import unittest
 
 from ota import buildOTA
-from smart_learner import generate_resets_pairs, learn_ota
+from smart_learner import generate_resets_pairs, learn_ota, generate_pair
 from ota import TimedWord
 from pstats import Stats
 import cProfile
 import time
 
 
-class SmartLearnLearnerTest(unittest.TestCase):
+class SmartLearnerTest(unittest.TestCase):
+    def testGen(self):
+        test_cases = [
+            [(), (0,), ((-1, 0), (-1, -1))],
+            [(0,), (0,), ((-1, -1), (0, 0))],
+            [(0,), (1,), ((-1, -1), (-1, 0), (0, -1), (0, 0))],
+            [(0,), (0, 1), ((-1, -1), (-1, 1), (0, 0), (0, 1))],
+            [(0, 1), (0, 1), ((-1, -1), (0, 0), (1, 1))],
+            [(0,), (0, 1, 2), ((-1, -1), (-1, 1), (-1, 2), (0, 0), (0, 1), (0, 2))]
+        ]
+
+        for t1, t2, pairs in test_cases:
+            res = generate_pair(t1, t2)
+            self.assertEqual(len(res), len(pairs))
+            self.assertEqual(set(res), set(pairs))
+
     def testGeneratePairs(self):
         test_cases = [
             [(TimedWord('a', 0.5),), (TimedWord('a', 0.5),), 
@@ -112,6 +127,7 @@ class SmartLearnLearnerTest(unittest.TestCase):
 
         with open("output", "w") as output_file:
             for f in test_cases:
+                print("file name: %s", f)
                 o = buildOTA("./examples/%s" % f)
                 start_time = time.time()
                 _ = learn_ota(o, limit=100, verbose=False)

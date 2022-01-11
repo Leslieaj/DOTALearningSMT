@@ -4,7 +4,7 @@ from interval import Interval
 from equivalence import ota_equivalent
 import copy
 import z3
-import time
+from os.path import commonprefix
 
 def isSameRegion(t1, t2):
     """Check whether t1 and t2 lies in the same region. That is,
@@ -13,6 +13,73 @@ def isSameRegion(t1, t2):
 
     """
     return t1 == t2 or (int(t1) != t1 and int(t2) != t2 and int(t1) == int(t2))
+
+def start_diff_index(t1, t2):
+    """Return the index from which prefix of 
+    t1 and t2 become different"""
+    return len(commonprefix([t1, t2]))
+
+def generate_pair(t1, t2):
+    """Generate all possible valid combination1
+    of reset in t1 and t2.
+
+    Input
+      - t1, t2 :: tuple
+    Output
+      - a tuple of pairs
+    """
+    idx = start_diff_index(t1, t2)
+    pairs = []
+    # Common prefix part
+    for ci in range(-1, idx):
+        pairs.append((ci, ci))
+        # t1: x |x| x o o
+        # t2: x |x| x |o o o|
+        for di1 in range(idx, len(t2)):
+            pairs.append((ci, di1))
+        # t1: x |x| x |o o|
+        # t2: x |x| x o o o
+        for di2 in range(idx, len(t1)):
+            pairs.append((di2, ci))
+
+    # Different prefix part
+    # t1: x x x |o| o
+    # t2: x x x |o o o|
+    for i in range(idx, len(t1)):
+        for j in range(idx, len(t2)):
+            pairs.append((i, j))
+
+    return tuple(pairs)
+
+def generate_reset_rows(t1, t2):
+    pairs = generate_pair(t1, t2)
+    resets = []
+    for i, j in pairs:
+        reset = dict()
+        reset[t1[:i+1]] = True
+        reset[t2[:j+1]] = True
+        for k in range(i+1, len(t1)):
+            reset[t1[:k+1]] = False
+        for v in range(j+1, len(t2)):
+            reset[t2[:v+1]] = False
+        if tuple() in reset:
+            del reset[tuple()]
+        resets.append(reset)
+        
+    return resets
+
+def generate_reset_at_ij(t1, t2, i, j):
+    reset = dict()
+    reset[t1[:i+1]] = True
+    reset[t2[:j+1]] = True
+    for k in range(i+1, len(t1)):
+        reset[t1[:k+1]] = False
+    for v in range(j+1, len(t2)):
+        reset[t2[:v+1]] = False
+    if tuple() in reset:
+        del reset[tuple()]
+
+    return reset
 
 def generate_resets_pairs(tw1, tw2):
     possible_pairs = []
@@ -185,8 +252,6 @@ class Learner:
 
         # Store the formulas in constraint 2: 
         self.constraint2_formula = []
-        # Store the (tw1, tw2, reset) triple which cannot be disti
-        self.constraint2_triple = []
 
         # Store the formulas in constraint4: consistency
         self.constraint4_formula1 = []
@@ -240,17 +305,17 @@ class Learner:
                 if sequence.is_accept != self.R[row].is_accept:
                     self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
                 else:
-                    pairs = generate_resets_pairs(row, tws)
+                    pairs = generate_pair(row, tws)
                     test_res = dict()
                     for i, j in pairs:
-                        reset = generate_row_reset(row, tws, i, j)
+                        reset = generate_reset_at_ij(row, tws, i, j)
                         test_res[(i, j)] = (self.findDistinguishingSuffix(self.R[row], sequence, reset) is not None)
 
                     if all(res for _, res in test_res.items()):
                         self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
                     else:
                         for (i, j), res in test_res.items():
-                            reset = generate_row_reset(row, tws, i, j)
+                            reset = generate_reset_at_ij(row, tws, i, j)
                             if res:
                                 f = z3.Implies(self.encodeReset(reset, self.reset_name),
                                                self.state_name[row] != self.state_name[tws])
@@ -275,7 +340,6 @@ class Learner:
                             # to constraint2, and record the information in constraint2_triple.
                             if reset[row] != reset[tws]:
                                 self.constraint2_formula.append(f)
-                                self.constraint2_triple.append((row, tws, reset, f))
                                 continue
 
                             suffix = self.findDistinguishingSuffix(self.R[row], sequence, reset)
