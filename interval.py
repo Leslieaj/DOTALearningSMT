@@ -144,6 +144,8 @@ def point_region(t):
     """Return the region [t, t]."""
     return Interval(t, True, t, True)
 
+zero_point_region = point_region(0)
+
 def frac_region(t):
     """Return the region (t, t+1)."""
     return Interval(t, False, t+1, False)
