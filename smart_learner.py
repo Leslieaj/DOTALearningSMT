@@ -51,23 +51,6 @@ def generate_pair(t1, t2):
 
     return tuple(pairs)
 
-def generate_reset_rows(t1, t2):
-    pairs = generate_pair(t1, t2)
-    resets = []
-    for i, j in pairs:
-        reset = dict()
-        reset[t1[:i+1]] = True
-        reset[t2[:j+1]] = True
-        for k in range(i+1, len(t1)):
-            reset[t1[:k+1]] = False
-        for v in range(j+1, len(t2)):
-            reset[t2[:v+1]] = False
-        if tuple() in reset:
-            del reset[tuple()]
-        resets.append(reset)
-        
-    return resets
-
 def generate_reset_at_i(t, i):
     reset = dict()
     reset[t[:i+1]] = True
@@ -78,87 +61,31 @@ def generate_reset_at_i(t, i):
     return reset
 
 def generate_reset_at_ij(t1, t2, i, j):
-    reset = dict()
-    reset[t1[:i+1]] = True
-    reset[t2[:j+1]] = True
-    for k in range(i+1, len(t1)):
-        reset[t1[:k+1]] = False
-    for v in range(j+1, len(t2)):
-        reset[t2[:v+1]] = False
-    if tuple() in reset:
-        del reset[tuple()]
-
+    reset = generate_reset_at_i(t1, i)
+    reset.update(generate_reset_at_i(t2, j))
     return reset
 
-def generate_resets_pairs(tw1, tw2):
-    possible_pairs = []
-    for i in range(len(tw1)+1):
-        for j in range(len(tw2)+1):
-            possible_pairs.append((i, j))
-
-    return tuple(possible_pairs)
-
-def set_row_reset(index, tw):
-    """Given index as the last reset point in tw, return the implied
-    reset information: True for the prefix ending at index, and False
-    for all longer prefixes.
-    
-    """
-    reset = dict()
-    for t in range(1, len(tw)+1):
-        if t < index:
-            continue
-        elif t == index:
-            reset[tw[:t]] = True
-        else:
-            reset[tw[:t]] = False
-    return reset
-
-def generate_row_reset(tw1, tw2, i, j):
-    """Given a pair of timed words, as well as last reset positions,
-    return the corresponding reset information.
-    
-    """
-    reset = dict()
-    reset.update(set_row_reset(i, tw1))
-    reset.update(set_row_reset(j, tw2))
-    return reset
-
-def generate_row_resets(tw1, tw2):
-    """Given a pair of timed words, iterate over all choices of last
-    reset, and collect together the corresponding reset information.
-    
-    """
+def generate_reset_rows(t1, t2):
+    pairs = generate_pair(t1, t2)
     resets = []
-    possible_resets = generate_resets_pairs(tw1, tw2)
-    for i, j in possible_resets:
-        reset = dict()
-        reset.update(set_row_reset(i, tw1))
-        reset.update(set_row_reset(j, tw2))
-        resets.append(reset)
-    return tuple(resets)
+    for i, j in pairs:
+        resets.append(generate_reset_at_ij(t1, t2, i, j))
+    return resets
 
-
-def generate_row_resets_enhance(tw1, tw2):
-    """Given a pair of timed words, iterate over all choices of last
-    *two* resets, and collect together the corresponding reset
-    information.
-
-    """
+def generate_row_resets_enhance(t1, t2):
+    def set_reset(t1, t2, reset, vs):
+        r = dict()
+        r.update(reset)
+        r[t1] = vs[0]
+        r[t2] = vs[1]
+        return r
     resets = []
-    possible_resets = generate_resets_pairs(tw1, tw2)
-
-    for i, j in possible_resets:
-        # split tw1 and tw2 into the former part
-        _tw1, _tw2 = tw1[:i-1], tw2[:j-1]
-        _resets = generate_row_resets(_tw1, _tw2)
-        for r in _resets:
-            reset = dict()
-            reset.update(set_row_reset(i, tw1))
-            reset.update(set_row_reset(j, tw2))
-            reset.update(r)
-            if reset not in resets:
-                resets.append(reset)
+    prefix_resets = generate_reset_rows(t1[:-1], t2[:-1])
+    b = (True, False)
+    for reset in prefix_resets:
+        comb = ((i, j) for i in b for j in b)
+        new_reset = [set_reset(t1, t2, reset, k) for k in comb]
+        resets += new_reset
     return resets
 
 
@@ -470,7 +397,7 @@ class Learner:
                 continue
             is_new_state = True
             for tw2 in list(self.S.keys())+delete_items:
-                possible_resets = generate_row_resets(tw1, tw2)
+                possible_resets = generate_reset_rows(tw1, tw2)
                 
                 for reset in possible_resets:
                     if self.findDistinguishingSuffix(self.R[tw1], self.R[tw2], reset, suffix) is None:
@@ -549,7 +476,7 @@ class Learner:
         sequence = self.R[tws]
         for row in self.S:
             if row != tws:
-                resets = generate_row_resets(row, tws)
+                resets = generate_reset_rows(row, tws)
                 for reset in resets:
                     if self.findDistinguishingSuffix(self.R[row], sequence, reset) is None:
                         return False
