@@ -170,7 +170,7 @@ class Letterword:
                     if letter.location in ota_B.accept_states:
                         B_accept = True
 
-        return B_accept and not A_accept
+        return A_accept != B_accept
 
     def immediate_asucc(self, ota_A, ota_B):
         """Perform an immediate action, without further time delays.
@@ -332,11 +332,11 @@ def both_reach_sink(lw, ota_A, ota_B):
     else:
         raise NotImplementedError("The format of letterword in function both_reach_sink")
 
-def ota_inclusion(max_time_value, ota_A, ota_B):
-    """Determines the inclusion L(B) <= L(A).
+def ota_equivalent(max_time_value, ota_A, ota_B):
+    """Determines the equivalence L(A) == L(B).
     
-    Returns True, None if L(B) <= L(A). Otherwise, returns False, ctx,
-    where ctx is a timed word accepted by B but not by A.
+    Returns True, None if L(A) == L(B). Otherwise, returns False, ctx,
+    where ctx is a timed word accepted by B but not by A, or vice versa.
 
     """
     w0 = init_letterword(ota_A, ota_B)
@@ -370,14 +370,3 @@ def ota_inclusion(max_time_value, ota_A, ota_B):
                 to_explore.append(nw)
         if w not in explored:
             explored.append(w)
-
-def ota_equivalent(max_time_value, ota_A, ota_B):
-    incl_BA, ctx = ota_inclusion(max_time_value, ota_A, ota_B)
-    if not incl_BA:
-        return False, ctx
-    
-    incl_AB, ctx = ota_inclusion(max_time_value, ota_B, ota_A)
-    if not incl_AB:
-        return False, ctx
-
-    return True, None
