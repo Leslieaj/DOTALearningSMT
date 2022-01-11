@@ -180,6 +180,7 @@ class Learner:
         # - If two rows can be distinguished under a given reset, then that
         #   reset implies the state_name of the two rows are not the same.
         self.constraint1_formula = []
+        self.constraint1_formula_num = 0
 
         # Store triples of the form (tw1, tw2, reset):
         # - The two rows tw1 and tw2 cannot be distinguished by the current
@@ -188,10 +189,12 @@ class Learner:
 
         # Store the formulas in constraint 2: 
         self.constraint2_formula = []
+        self.constraint2_formula_num = 0
 
         # Store the formulas in constraint4: consistency
         self.constraint4_formula1 = []
         self.constraint4_formula2 = []
+        self.constraint4_formula_num = 0
         # Store the (tw1, tw2, reset) triple in which both tw1[:-1] == tw2[:-1] and tw1 == tw2
         self.constraint4_triple1 = []
         # Store the (tw1, tw2, reset) triple in which tw1[:-1] == tw2[-1]
@@ -206,6 +209,9 @@ class Learner:
 
         # Store the query result
         self.query_result = dict()
+
+        # Incremental solver
+        self.solver = z3.Solver()
 
     def __str__(self):
         res = 'R:\n'
@@ -603,6 +609,17 @@ class Learner:
 
         return formulas
 
+    def clearConstraint(self):
+        self.constraint1_formula_num += len(self.constraint1_formula)
+        self.constraint1_formula  = []
+        self.constraint2_formula_num += len(self.constraint2_formula)
+        self.constraint2_formula  = []
+        self.constraint4_formula_num += \
+            len(self.constraint4_formula1) + len(self.constraint4_formula2)
+        self.constraint4_formula1 = []
+        self.constraint4_formula2 = []
+        
+
     def findReset(self, state_num, enforce_extra):
         """Find a valid setting of resets and states.
         
@@ -625,16 +642,23 @@ class Learner:
             constraint8 = self.encodeExtraS(state_num)
         else:
             constraint8 = []
-        s = z3.Solver()
-        print("%d %d %d\n" % (len(constraint1), len(constraint2), len(constraint4)))
-        s.add(*(constraint1 + constraint2 + constraint4 + constraint5 + constraint6 + constraint7 + constraint8))
 
-        if str(s.check()) == "unsat":
+        print("%d %d %d\n" % (self.constraint1_formula_num,
+                    self.constraint2_formula_num, self.constraint4_formula_num))
+        self.solver.push()
+        self.solver.add(*(constraint1 + constraint2 + constraint4))
+        self.solver.push()
+        self.solver.add(*(constraint5 + constraint6 + constraint7 + constraint8))
+        
+        if str(self.solver.check()) == "unsat":
             # No assignment can be found for current S, extra_S, and state_num
+            self.solver.pop()
             return None, None
 
         # An assignment is found, construct resets and states from the model.
-        model = s.model()
+        model = self.solver.model()
+        self.solver.pop()
+        self.clearConstraint()
         resets, states = dict(), dict()
 
         for row in self.R:
