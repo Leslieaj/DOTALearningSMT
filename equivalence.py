@@ -72,6 +72,12 @@ class Letterword:
         self.pre_lw = pre_lw
         self.action = action
 
+        assert len(self.lst) <= 2
+        if len(self.lst) == 1:
+            assert len(self.lst[0]) == 2, ("self.lst = %s" % self.lst)
+        else:
+            assert len(self.lst[0]) + len(self.lst[1]) == 2
+
     def __eq__(self, other):
         return self.lst == other.lst and self.frac_times == other.frac_times
 

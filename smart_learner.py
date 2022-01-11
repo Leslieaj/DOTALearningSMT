@@ -729,6 +729,11 @@ class Learner:
                     for tw, pos in states.items():
                         if pos == source:
                             return False, tw
+
+                # If the first transition is not zero, add transition to sink
+                if trans[0][0] != 0:
+                    trans = [(0, True, states["sink"])] + trans
+
                 trans_new = [trans[0]]
                 for i in range(1, len(trans)):
                     time, reset, target = trans[i]
