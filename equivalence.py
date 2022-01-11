@@ -7,7 +7,7 @@ import copy
 from decimal import Decimal
 
 from ota import TimedWord
-from interval import Interval, point_region
+from interval import Interval, zero_point_region
 
 
 def round_div_2(r):
@@ -234,7 +234,7 @@ class Letterword:
                             if tran.action == action and tran.source == letter.location and \
                                 tran.constraint.contains_interval(letter.region):
                                 if tran.reset:
-                                    A_reset_list.append(Letter('A', tran.target, point_region(0)))
+                                    A_reset_list.append(Letter('A', tran.target, zero_point_region))
                                 else:
                                     A_noreset_list[i].append(Letter('A', tran.target, letter.region))
                     else:  # letter.side == 'B'
@@ -242,7 +242,7 @@ class Letterword:
                             if tran.action == action and tran.source == letter.location and \
                                 tran.constraint.contains_interval(letter.region):
                                 if tran.reset:
-                                    B_reset_list.append(Letter('B', tran.target, point_region(0)))
+                                    B_reset_list.append(Letter('B', tran.target, zero_point_region))
                                 else:
                                     B_noreset_list[i].append(Letter('B', tran.target, letter.region))
 
@@ -291,8 +291,8 @@ class Letterword:
 
 def init_letterword(ota_A, ota_B):
     """Returns the initial letterword for determining inclusion L(B) <= L(A)."""
-    return Letterword([{Letter('A', ota_A.init_state, point_region(0)),
-                        Letter('B', ota_B.init_state, point_region(0))}], [0])
+    return Letterword([{Letter('A', ota_A.init_state, zero_point_region),
+                        Letter('B', ota_B.init_state, zero_point_region)}], [0])
 
 def explored_dominated(explored, w, ota_A, ota_B):
     # if both_reach_sink(w, ota_A, ota_B) == True:
