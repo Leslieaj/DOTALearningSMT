@@ -190,7 +190,7 @@ class SmartLearnerTest(unittest.TestCase):
                 assert res, ("missed ctx %s" % ctx)
 
                 end_time = time.time()
-                output_file.write("Test %s: %.3f (s)\n Membership query: %d Equivalence query: %d" 
+                output_file.write("Test %s: %.3f (s) Membership query: %d Equivalence query: %d\n" 
                             % (f, end_time - start_time, mem_num, eq_num))
                 output_file.flush()
                 if graph:
