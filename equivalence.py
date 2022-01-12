@@ -157,7 +157,7 @@ class Letterword:
 
     def is_bad(self, ota_A, ota_B):
         """Determine whether the letterword is bad. That is the B-side is
-        accepting, but none of the A-side is accepting.
+        accepting, but none of the A-side is accepting, or vice versa.
 
         """
         A_accept, B_accept = False, False

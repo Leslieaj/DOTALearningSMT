@@ -2,6 +2,7 @@ import pprint
 from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA, OTAToJSON
 from interval import Interval
 from equivalence import ota_equivalent
+from equivalence_simple import OTAEquivalence
 import copy
 import z3
 from os.path import commonprefix
@@ -870,7 +871,10 @@ def learn_ota(ota, limit=30, verbose=True):
 
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
-        res, ctx = ota_equivalent(max_time, assist_ota, candidate)
+
+        ota_equiv = OTAEquivalence(max_time, assist_ota, candidate)
+        res, ctx_path = ota_equiv.test_equivalent()
+        # res, ctx = ota_equivalent(max_time, assist_ota, candidate)
 
         if not res and verbose:
             print(candidate)
@@ -881,7 +885,7 @@ def learn_ota(ota, limit=30, verbose=True):
             # break
             return candidate
 
-        ctx_path = tuple(ctx.find_path(assist_ota, candidate))
+        # ctx_path = tuple(ctx.find_path(assist_ota, candidate))
         if verbose:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)

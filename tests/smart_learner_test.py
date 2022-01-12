@@ -1,8 +1,9 @@
 import unittest
 import sys
 sys.path.append("./")
-from ota import buildOTA
-from smart_learner import learn_ota, generate_pair
+from ota import buildOTA, OTAToDOT
+from smart_learner import learn_ota, generate_pair, compute_max_time
+from equivalence import ota_equivalent
 from ota import TimedWord
 from pstats import Stats
 import cProfile
@@ -166,9 +167,13 @@ class SmartLearnerTest(unittest.TestCase):
             "14_4_20/14_4_20-8.json",   # 23.895
             "14_4_20/14_4_20-9.json",   # 34.870
             "14_4_20/14_4_20-10.json",  # 54.372
+
+            "TCP.json",
         ]
 
-        profile = False
+        profile = True
+        graph = False
+
         if profile:
             pr = cProfile.Profile()
             pr.enable()
@@ -178,10 +183,18 @@ class SmartLearnerTest(unittest.TestCase):
                 print("file name: %s", f)
                 o = buildOTA("./examples/%s" % f)
                 start_time = time.time()
-                _ = learn_ota(o, limit=100, verbose=False)
+                learned_ota = learn_ota(o, limit=100, verbose=False)
+
+                max_time = compute_max_time(o)
+                res, ctx = ota_equivalent(max_time, learned_ota, o)
+                assert res, ("missed ctx %s" % ctx)
+
                 end_time = time.time()
                 output_file.write("Test %s: %.3f (s)\n" % (f, end_time - start_time))
                 output_file.flush()
+                if graph:
+                    OTAToDOT(o, "ota_original")
+                    OTAToDOT(learned_ota, "ota_learned")
 
         if profile:
             p = Stats(pr)
