@@ -183,14 +183,15 @@ class SmartLearnerTest(unittest.TestCase):
                 print("file name: %s", f)
                 o = buildOTA("./examples/%s" % f)
                 start_time = time.time()
-                learned_ota = learn_ota(o, limit=100, verbose=False)
+                learned_ota, mem_num, eq_num = learn_ota(o, limit=100, verbose=False)
 
                 max_time = compute_max_time(o)
                 res, ctx = ota_equivalent(max_time, learned_ota, o)
                 assert res, ("missed ctx %s" % ctx)
 
                 end_time = time.time()
-                output_file.write("Test %s: %.3f (s)\n" % (f, end_time - start_time))
+                output_file.write("Test %s: %.3f (s)\n Membership query: %d Equivalence query: %d" 
+                            % (f, end_time - start_time, mem_num, eq_num))
                 output_file.flush()
                 if graph:
                     OTAToDOT(o, "ota_original")

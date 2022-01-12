@@ -796,6 +796,7 @@ def learn_ota(ota, limit=30, verbose=True):
     assist_ota = buildAssistantOTA(ota)
     max_time_ota = compute_max_time(ota)
     state_num = 1
+    eq_query_num = 0
 
     for step in range(1, limit):
         print("Step", step)
@@ -869,7 +870,7 @@ def learn_ota(ota, limit=30, verbose=True):
         ota_equiv = OTAEquivalence(max_time, assist_ota, candidate)
         res, ctx_path = ota_equiv.test_equivalent()
         # res, ctx = ota_equivalent(max_time, assist_ota, candidate)
-
+        eq_query_num += 1
         if not res and verbose:
             print(candidate)
         if res:
@@ -877,9 +878,11 @@ def learn_ota(ota, limit=30, verbose=True):
             print("Finished in %s steps " % step)
             # OTAToJSON(candidate, "candidate")
             # break
-            return candidate
+            return candidate, len(ota.query), eq_query_num
 
         # ctx_path = tuple(ctx.find_path(assist_ota, candidate))
         if verbose:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
+
+    raise AssertionError
