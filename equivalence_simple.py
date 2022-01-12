@@ -179,10 +179,12 @@ class OTAEquivalence:
     def compute_wsucc(self, c):
         """Compute the list of all successors of c."""
         delay_seq = self.delay_seq(c)
-        results = set()
+        results = []
         for delay in delay_seq:
             for action in self.ota_A.sigma:
-                results.add(self.immediate_asucc(delay, action))
+                imm_asucc = self.immediate_asucc(delay, action)
+                if imm_asucc not in results:
+                    results.append(imm_asucc)
         return results
 
     def find_path(self, c):
