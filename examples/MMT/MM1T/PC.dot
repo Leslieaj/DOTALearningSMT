@@ -1,7 +1,7 @@
 digraph g {
 __start0 [label="" shape="none"];
 node [margin=0 width=0.5 shape=circle];
-c0 -> c2 [label="ُStart/SpauState"];
+c0 -> c2 [label="Start/SpauState"];
 c2 -> s3 [label="SetStandby/StatusBusy+StbyState"];
 c2 -> c27 [label="SetPurge/StatusBusy+SpulState\nx:=10"];
 c27 -> c2 [label="SetPause/SpauState"];

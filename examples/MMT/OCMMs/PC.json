@@ -1,0 +1,82 @@
+{
+    "name": "pc",
+    "l": ["1", "2", "3", "4", "5", "6", "7", "8"],
+    "inputs": ["void", "Start?", "SetPurge?", "SetStandby?", "SetPause?", "LeakageTest?", "ResponseCheck?", "StartMeasurement?", "StartIntegralMeasurement?"],
+    "outputs": ["void", "SpauState!", "StatusBusy+SpulState!", "StatusBusy+StbyState!", "StbyState!", "StatusBusy+SlecState!", "StatusBusy+SpauState!",
+                "StatusBusy+SegaState!", "StatusBusy+SmgaState!", "StatusBusy+SpulState+SpulState!", "StatusBusy+SintState!"],
+    "tran": {
+      "0": [
+        "1", "Start?", "SpauState!", "[0,+)", "r", "2"
+      ],
+      "1": [
+        "2", "SetPurge?", "StatusBusy+SpulState!", "[0,+)", "r", "3"
+      ],
+      "2": [
+        "2", "SetStandby?", "StatusBusy+StbyState!", "[0,+)", "r", "4"
+      ],
+      "3": [
+        "3", "SetPause?", "SpauState!", "[0,10)", "r", "2"
+      ],
+      "4": [ 
+        "3", "void", "SpauState!", "[10,10]", "r", "2"
+      ],
+      "5": [
+        "3", "SetStandby?", "StbyState!", "[0,10)", "r", "4"
+      ],
+      "6": [
+        "4", "LeakageTest?", "StatusBusy+SlecState!", "[0,+)", "r", "5"
+      ],
+      "7": [
+        "4", "SetPause?", "StatusBusy+SpauState!", "[0,+)", "r", "2"
+      ],
+      "8": [
+        "4", "ResponseCheck?", "StatusBusy+SegaState!", "[0,+)", "r", "5"
+      ],
+      "9": [
+        "4", "StartMeasurement?", "StatusBusy+SmgaState!", "[0,+)", "r", "6"
+      ],
+      "10": [
+        "4", "SetPurge?", "StatusBusy+SpulState+SpulState!", "[0,+)", "r", "5"
+      ],
+      "11": [
+        "5", "SetPause?", "SpauState!", "[0,10)", "r", "2"
+      ],
+      "12": [
+        "5", "SetStandby?", "StbyState!", "[0,10)", "r", "4"
+      ],
+      "13": [
+        "5", "void", "StbyState!", "[10,10]", "r", "4"
+      ],
+      "14": [
+        "6", "SetStandby?", "StatusBusy+StbyState!", "[0,+)", "r", "4"
+      ],
+      "15": [
+        "6", "SetPause?", "StatusBusy+SpauState!", "[0,+)", "r", "2"
+      ],
+      "16": [
+        "6", "StartIntegralMeasurement?", "StatusBusy+SintState!", "[0,+)", "r", "7"
+      ],
+      "17": [
+        "6", "SetZeroPoint?", "StatusBusy+SmgaState!", "[0,+)", "r", "8"
+      ],
+      "18": [
+        "7", "StartIntegralMeasurement?", "StatusBusy+SmgaState!", "[0,+)", "r", "6"
+      ],
+      "19": [
+        "7", "SetStandby?", "StatusBusy+StbyState!", "[0,+)", "r", "4"
+      ],
+      "20": [
+        "7", "SetPause?", "StatusBusy+SpauState!", "[0,+)", "r", "2"
+      ],
+      "21": [
+        "8", "SetPause?", "StatusBusy+SpauState!", "[0,10)", "r", "2"
+      ],
+      "22": [
+        "8", "SetStandby?", "StatusBusy+StbyState!", "[0,10)", "r", "4"
+      ],
+      "23": [
+        "8", "void", "StatusBusy+SmgaState!", "[10,10]", "r", "6"
+      ]
+    },
+    "init": "1"
+  }
