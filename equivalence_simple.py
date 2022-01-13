@@ -80,13 +80,20 @@ class OTAEquivalence:
         self.init_config = Configuration(
             self.ota_A.init_state, 0, self.ota_B.init_state, 0, dec_zero, dec_zero)
 
+        # Mapping from n to region
+        self.region_dict = dict()
+
     def int_to_region(self, n):
-        if n % 2 == 0:
-            return interval.point_region(n // 2)
+        if n in self.region_dict:
+            return self.region_dict[n]
+        elif n % 2 == 0:
+            self.region_dict[n] = interval.point_region(n // 2)
         elif n == 2 * self.max_value + 1:
-            return interval.inf_region(self.max_value)
+            self.region_dict[n] = interval.inf_region(self.max_value)
         else:
-            return interval.frac_region(n // 2)
+            self.region_dict[n] = interval.frac_region(n // 2)
+
+        return self.region_dict[n]
 
     def is_inf(self, n):
         return n == 2 * self.max_value + 1
