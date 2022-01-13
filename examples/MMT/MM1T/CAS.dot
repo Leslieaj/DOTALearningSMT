@@ -1,0 +1,26 @@
+digraph g { 
+    __start0 [label="" shape="none"];
+    node [margin=0 width=0.5 shape=circle];
+    s12 -> s11 [label="lock"]; 
+    s12 -> c2 [label="close"]; 
+    s11 -> s12 [label="unlock"]; 
+    s11 -> s8 [label="close\n x:=2"]; 
+    c2 -> s12 [label="open"]; 
+    c2 -> s8 [label="lock\n x:=2"]; 
+    s8 -> c2 [label="unlock"]; 
+    s8 -> c5 [label="to[x]/armedOn"]; 
+    s8 -> s11 [label="open"]; 
+    c5 -> c2 [label="unlock/armedOff"]; 
+    s4 -> s12 [label="unlock/soundOff+flashOff"]; 
+    s4 -> s0 [label="to[x]/soundOff\n x:=27"]; 
+    s0 -> c1 [label="to[x]/flashOff"]; 
+    s0 -> s12 [label="unlock/flashOff"]; 
+    c1 -> c5 [label="close/armedOn"];
+    c1 -> s12 [label="unlock"];
+    c5 -> s4 [label="open/armedOff+flashOn+SoundOn\n x:=3"]; 
+    __start0 -> s12;
+    {rank = same; s11; s12;} 
+    {rank = same; s8; c2;} 
+    {rank = same; c5;} 
+    {rank = same; s4;} 
+}

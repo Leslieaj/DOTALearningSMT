@@ -1,0 +1,38 @@
+digraph g {
+	rankdir=TB;
+	closed [label="CLOSED", peripheries=2];
+	listen [label="LISTEN"];
+	estab [label="ESTAB", peripheries=2];
+	syn_rcvd [label="SYN RCVD"];
+	syn_sent [label="SYN SENT"];
+	finwait_1 [label="FINWAIT-1" fillcolor=lightblue style=filled];
+	finwait_2 [label="FINWAIT-2" fillcolor=green style=filled];
+	closing[label="CLOSING" fillcolor=yellow style=filled];
+	close_wait[label="CLOSE WAIT" fillcolor=pink style=filled];
+	last_ack[label="LAST-ACK"];
+	time_wait[label="TIMEWAIT"];
+	closed -> listen [label="OPEN(PASSIVE)"];
+	closed -> syn_sent [label="OPEN(ACTIVE)/SYN"];
+	listen -> closed [label="CLOSE"];
+	listen -> syn_rcvd [label="SYN/SYN+ACK"];
+	listen -> syn_sent [label="SEND/SYN"];
+	syn_sent -> closed [label="CLOSE"];
+	syn_sent -> syn_rcvd [label="SYN/ACK" constraint=false];
+	syn_sent -> estab [label="SYN+ACK/ACK"];
+	syn_rcvd -> estab [label="ACK"];
+	syn_rcvd -> finwait_1[label="CLOSE/FIN"];
+	estab -> finwait_1[label="CLOSE/FIN"];
+	estab -> close_wait[label="FIN/ACK"];
+	close_wait -> last_ack[label="CLOSE/FIN"];
+	finwait_1 -> closing [label="FIN/ACK"];
+	finwait_1 -> finwait_2 [label="ACK"];
+	finwait_2 -> time_wait [label="FIN/ACK x:=20"];
+	closing -> time_wait [label="ACK x:=20"];
+	last_ack -> closed [label="ACK"];
+	time_wait -> closed [label="to[x]"];
+
+__start0 [label="start" shape="none" width="0" height="0"];
+__start0 -> closed;
+	{rank=same; syn_rcvd; syn_sent;}
+	{rank=same; finwait_2; closing; last_ack;}
+}

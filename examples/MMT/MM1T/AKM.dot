@@ -1,0 +1,35 @@
+digraph g {
+
+	s0 [shape="circle" label="0"];
+	s1 [shape="circle" label="1"];
+	s2 [shape="circle" label="2"];
+	s3 [shape="circle" label="3"];
+	s0 -> s0 [label="to[x] / λ"];
+	s0 -> s1 [label="Auth / Auth(success) x:=500ms"];
+	s0 -> s0 [label="AssoReq / Deauth(STA-not-auth) Stop[x]"];
+	s0 -> s0 [label="Deauth / λ Stop[x]"];
+	s0 -> s2 [label="Disas / λ Stop[x]"];
+	s0 -> s0 [label="ProbeReq / ProbeResp Stop[x]"];
+	s1 -> s0 [label="to[x] / Deauth(auth-expired) Stop[x]"];
+	s1 -> s1 [label="Auth / Auth(success) x:=500ms"];
+	s1 -> s3 [label="AssoReq / AssoResp(success);E1(KD=WPA2|CS=SHA1) x:=2.5s"];
+	s1 -> s0 [label="Deauth / λ Stop[x]"];
+	s1 -> s2 [label="Disas / λ Stop[x]"];
+	s1 -> s0 [label="ProbeReq / ProbeResp Stop[x]"];
+	s2 -> s2 [label="to[x] / λ"];
+	s2 -> s1 [label="Auth / Auth(success) x:=500ms"];
+	s2 -> s2 [label="AssoReq / Deauth(class3-from-nonass);Deauth(STA-not-auth) Stop[x]"];
+	s2 -> s2 [label="Deauth / λ Stop[x]"];
+	s2 -> s2 [label="Disas / λ"];
+	s2 -> s2 [label="ProbeReq / ProbeResp Stop[x]"];
+	s3 -> s0 [label="to[x] / Disas(inactivity) Stop[x]"];
+	s3 -> s1 [label="Auth / Auth(success) x:=1.0s"];
+	s3 -> s3 [label="AssoReq / AssoResp(success);E1(KD=WPA2|CS=SHA1) x:=2.5s"];
+	s3 -> s0 [label="Deauth / λ Stop[x]"];
+	s3 -> s2 [label="Disas / λ Stop[x]"];
+	s3 -> s0 [label="ProbeReq / ProbeResp Stop[x]"];
+
+__start0 [label="" shape="none" width="0" height="0"];
+__start0 -> s0;
+
+}
