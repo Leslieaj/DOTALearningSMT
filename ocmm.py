@@ -1,46 +1,13 @@
-# Mealy machine with one clock
+"""Mealy machine with one clock"""
 
 import json
 from interval import Interval, complement_intervals
 from ota import Location
 
-class IOTimedWord:
-    """Timed word over input and output actions"""
-
-    def __init__(self, input, output, time):
-        """The initial data include:
-
-        input : str, name of the input action.
-        output: str, name of the output action.
-        time : Decimal, logical clock value.
-
-        """
-        self.input = input
-        self.output = output
-        self.time = time
-
-    def __eq__(self, other):
-        return self.input == other.input and self.output == other.output and self.time == other.time
-
-    def __le__(self, other):
-        return (self.input, self.time, self.output) <= (other.input, other.time, other.output)
-
-    def __lt__(self, other):
-        return (self.input, self.time, self.output) < (other.input, other.time, other.output)
-
-    def __hash__(self):
-        return hash(('IOTIMEDWORD', self.input, self.output, self.time))
-
-    def __str__(self):
-        return '(%s,%s,%s)' % (self.input, self.output, str(self.time))
-
-    def __repr__(self):
-        return str(self)
-
 class OCMMTran:
     """Represnt a transition in a Mealy machine with one clock"""
 
-    def __init__(self, source, input, output, constraint, reset, target):
+    def __init__(self, source, input_action, output, constraint, reset, target):
         """The initial data include:
 
         source : str, name of the source location.
@@ -52,7 +19,7 @@ class OCMMTran:
 
         """
         self.source = source
-        self.input = input
+        self.input = input_action
         self.output = output
         self.constraint = constraint
         self.reset = reset
@@ -63,24 +30,12 @@ class OCMMTran:
 
     def __repr__(self):
         return str(self)
-
-    def is_pass(self, source, input, output, time):
-        """Whether the given input/output actions and time is allowed by the transition.
-
-        source : str, source of the input action.
-        input : str, name of the input action.
-        output : str, name of the output action.
-        time : Decimal, time at which the input/output action should occur.
-
-        """
-        return source == self.source and input == self.input and output == self.output and\
-            self.constraint.contains_point(time)
     
-    def pass_input(self, source, input, time):
+    def pass_input(self, source, input_action, time):
         """Whether the given input action and time is allowed by the transition.
         If allowed, return the output transition. Otherwise, return 'None'.
         """
-        if source == self.source and input == self.input and self.constraint.contains_point(time):
+        if source == self.source and input_action == self.input and self.constraint.contains_point(time):
             return self.output
         else:
             return None
@@ -93,31 +48,40 @@ class OCMM:
 
         name : str, name of the automata.
         input : list(str), list of input actions.
-        output: list(str), list of ooutput actions.
+        output : list(str), list of output actions.
         locations : list(Location), list of locations.
         trans : list(OTATran), list of transitions.
         init_state : str, name of the initial locattion.
-        sink_name ： str, name of the sink location.
+        sink_name : str, name of the sink location.
 
         """
         self.name = name
-        self.inputs = inputs
+        self.sigma = inputs
         self.outputs = outputs
         self.locations = locations
-        self.trans = trans
+        self.trans = sorted(trans, key=(lambda x: x.source))
         self.init_state = init_state
         self.sink_name = sink_name
 
-        # store the runIOTimedWord result
+        # Store the runIOTimedWord result
         self.query = dict()
-    
+
+        # Create index of transitions
+        self.trans_dict = dict()
+        for action in self.sigma:
+            for loc in self.locations:
+                self.trans_dict[(action, loc.name)] = []
+
+        for tran in self.trans:
+            self.trans_dict[(tran.input, tran.source)].append(tran)
+
     def __str__(self):
         res = ""
         
         res += "OCMM name: \n"
         res += self.name + "\n"
         res += "Input actions and length of input actions: " + "\n"
-        res += str(self.inputs) + " " + str(len(self.inputs)) + "\n"
+        res += str(self.sigma) + " " + str(len(self.sigma)) + "\n"
         res += "Output actions and length of output actions: " + "\n"
         res += str(self.outputs) + " " + str(len(self.outputs)) + "\n"
         res += "Location (name, init, accept, sink) :\n"
@@ -138,65 +102,27 @@ class OCMM:
     def runInputTimedWord(self, itws):
         """Execute the given timed word over inputs.
         itws : list of TimedWord over inputs.
-        Return the output sequence. (Currently only implement the deterministic case.)
+        Return the output. (Currently only implement the deterministic case.)
         """
-        outputs = []
+        output = None
+        if not itws:
+            return output
         cur_state, cur_time = self.init_state, 0
         for itw in itws:
-            moved = False
             for tran in self.trans:
                 output = tran.pass_input(cur_state, itw.action, cur_time + itw.time)
-                if output != None:
-                    outputs.append(output)
+                if output is not None:
                     cur_state = tran.target
                     if tran.reset:
                         cur_time = 0
                     else:
                         cur_time += itw.time
-                    moved = True
                     break
-            if moved == False: # all transition go to sink location return the output 'void' for any inputs
-                outputs.append('void')
-        return outputs 
+            if output is None: # no tran matches current itw (trapped in sink state)
+                return "sink!"
 
-    # def runIOTimedWord(self, iotws):
-    #     """Execute the given IO timed words.
-        
-    #     iotws : list(IOTimedWord)
+        return output
 
-    #     Returns whether the IO timed word is accepted (1), rejected (0), or goes
-    #     to sink (-1).
-
-    #     TODO: we currently only implement the deterministic case.
-
-    #     """
-    #     # if iotws in self.query:
-    #     #     return self.query[iotws]
-    #     cur_state, cur_time = self.init_state, 0
-    #     for iotw in iotws:
-    #         moved = False
-    #         for tran in self.trans:
-    #             if tran.is_pass(cur_state, iotw.input, iotw.output, cur_time + iotw.time):
-    #                 cur_state = tran.target
-    #                 if tran.reset:
-    #                     cur_time = 0
-    #                 else:
-    #                     cur_time += iotw.time
-    #                 moved = True
-    #                 break
-    #         if not moved:
-    #             # self.query[iotws] = -1
-    #             return -1  # assume to go to sink
-
-    #     if self.sink_name is not None and cur_state == self.sink_name:            
-    #         result = -1
-    #     elif cur_state in self.accept_states:
-    #         result = 1
-    #     else:
-    #         result = 0
-
-    #     # self.query[iotws] = result
-    #     return result
 
 def buildOCMM(jsonfile):
     """Build the teacher OTA from a json file."""
@@ -218,12 +144,12 @@ def buildOCMM(jsonfile):
         trans = []
         for tran in trans_set:
             source = trans_set[tran][0]
-            input = trans_set[tran][1]
+            input_action = trans_set[tran][1]
             output = trans_set[tran][2]
             constraint = Interval(trans_set[tran][3])
             reset = (trans_set[tran][4] == 'r')
             target = trans_set[tran][5]
-            ocmm_tran = OCMMTran(source, input, output, constraint, reset, target)
+            ocmm_tran = OCMMTran(source, input_action, output, constraint, reset, target)
             trans.append(ocmm_tran)
         return OCMM(name, inputs, outputs, L, trans, init_state)
 
@@ -238,7 +164,7 @@ def buildAssistantOCMM(ocmm):
     for l in ocmm.locations:
         # Mapping from inputs to list of transitions from l with the input.
         l_dict = {}
-        for key in ocmm.inputs:
+        for key in ocmm.sigma:
             l_dict[key] = []
 
         for tran in ocmm.trans:
@@ -253,7 +179,7 @@ def buildAssistantOCMM(ocmm):
                 cuintervals = [Interval("[0,+)")]
             if len(cuintervals) > 0:
                 for c in cuintervals:
-                    new_trans.append(OCMMTran(l.name, key, 'void', c, True, sink.name))
+                    new_trans.append(OCMMTran(l.name, key, "sink!", c, True, sink.name))
 
     assist_name = "Assist_" + ocmm.name
     assist_locations = [location for location in ocmm.locations]
@@ -265,16 +191,18 @@ def buildAssistantOCMM(ocmm):
         # Add sink location
         assist_locations.append(sink)
 
-        # Add empty action 'void' to ocmm.outputs
-        if 'void' not in ocmm.outputs:
-            assist_outputs.append('void')
+        # In order to avoid ambiguity in equivalence test, 
+        # assign the new state label 'sink!' as the output of 
+        # each input to sink state
+        assert "sink!" not in ocmm.outputs, "`sink!` should not occur in original output!"
+        assist_outputs.append("sink!")
 
         # Add transitions from normal locations to sink
         assist_trans.extend(new_trans)
 
         # Add loops from sink to sink
-        for label in ocmm.inputs:
-            assist_trans.append(OCMMTran(sink.name, label, 'void', Interval("[0,+)"), True, sink.name))
+        for label in ocmm.sigma:
+            assist_trans.append(OCMMTran(sink.name, label, 'sink!', Interval("[0,+)"), True, sink.name))
 
-    assist_ocmm = OCMM(assist_name, ocmm.inputs, assist_outputs, assist_locations, assist_trans, assist_init, sink_name=sink.name)
+    assist_ocmm = OCMM(assist_name, ocmm.sigma, assist_outputs, assist_locations, assist_trans, assist_init, sink_name=sink.name)
     return assist_ocmm

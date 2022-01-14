@@ -63,15 +63,15 @@ class Configuration:
                self.frac_A == other.frac_A and self.frac_B == other.frac_B
 
     def __str__(self):
-        return "%s %s %s %s %s" % (
-            self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B)
+        return "loc_A: %s region_A: %s loc_B: %s region_B: %s frac_A: %s frac_B: %s \n(pre: %s action: %s)" % (
+            self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B, self.pre, self.action)
 
     def __hash__(self):
         return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B))
 
 
 class OTAEquivalence:
-    def __init__(self, max_value, ota_A, ota_B):
+    def __init__(self, max_value, ota_A, ota_B, is_ocmm=False):
         self.max_value = max_value
         self.ota_A = ota_A
         self.ota_B = ota_B
@@ -82,6 +82,9 @@ class OTAEquivalence:
 
         # Mapping from n to region
         self.region_dict = dict()
+
+        # Indicating the type of input automata
+        self.is_ocmm = is_ocmm
 
     def int_to_region(self, n):
         if n in self.region_dict:
@@ -158,9 +161,13 @@ class OTAEquivalence:
         but B side is not accepting, or vice versa.
         
         """
-        A_accept = c.loc_A in self.ota_A.accept_states
-        B_accept = c.loc_B in self.ota_B.accept_states
-        return A_accept != B_accept
+        if self.is_ocmm:
+            path = self.find_path(c)
+            return self.ota_A.runInputTimedWord(path) != self.ota_B.runInputTimedWord(path)
+        else:
+            A_accept = c.loc_A in self.ota_A.accept_states
+            B_accept = c.loc_B in self.ota_B.accept_states
+            return A_accept != B_accept
     
     def immediate_asucc(self, c, action):
         """Perform an immediate action, without further time delays."""
