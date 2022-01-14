@@ -61,7 +61,7 @@ class OCMM:
         self.locations = locations
         self.trans = sorted(trans, key=(lambda x: x.source))
         self.init_state = init_state
-        self.sink_name = sink_name
+        self.sink_name = str(len(locations) + 1)
 
         # Store the runIOTimedWord result
         self.query = dict()
@@ -99,14 +99,19 @@ class OCMM:
         res += str(self.sink_name) + "\n"
         return res
 
-    def runInputTimedWord(self, itws):
+    def runTimedWord(self, itws):
         """Execute the given timed word over inputs.
         itws : list of TimedWord over inputs.
-        Return the output. (Currently only implement the deterministic case.)
+        Return the output and type of state (accept or sink). 
+        
+        (Currently only implement the deterministic case.)
         """
+        if itws in self.query:
+            return self.query[itws]
+
         output = None
         if not itws:
-            return output
+            return output, 1
         cur_state, cur_time = self.init_state, 0
         for itw in itws:
             for tran in self.trans:
@@ -118,10 +123,13 @@ class OCMM:
                     else:
                         cur_time += itw.time
                     break
-            if output is None: # no tran matches current itw (trapped in sink state)
-                return "sink!"
+            if output is None or output == "sink!":
+                return "sink!", -1
+            elif output == "sink!":
+                return output, -1
 
-        return output
+        self.query[itws] = (output, 1)
+        return output, 1
 
 
 def buildOCMM(jsonfile):
@@ -135,7 +143,7 @@ def buildOCMM(jsonfile):
         trans_set = data["tran"]
         init_state = data["init"]
         # accept_list = [l for l in data["accept"]]
-        L = [Location(location, False, False) for location in locations_list]
+        L = [Location(location, False, True) for location in locations_list]
         for l in L:
             if l.name == init_state:
                 l.init = True

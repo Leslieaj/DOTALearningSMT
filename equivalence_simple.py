@@ -163,7 +163,8 @@ class OTAEquivalence:
         """
         if self.is_ocmm:
             path = self.find_path(c)
-            return self.ota_A.runInputTimedWord(path) != self.ota_B.runInputTimedWord(path)
+            return self.ota_A.runTimedWord(path)[0] !=\
+                self.ota_B.runTimedWord(path)[0]
         else:
             A_accept = c.loc_A in self.ota_A.accept_states
             B_accept = c.loc_B in self.ota_B.accept_states

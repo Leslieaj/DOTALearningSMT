@@ -29,13 +29,13 @@
         "2", "?AssoReq", "!AssoResp(success) + E1(KD=WPA2|CS=SHA1)", "[0,1)", "r", "3"
       ],
       "7": [
-        "2", "void", "!Deauth(auth-expired)", "[1,1]", "r", "0"
+        "2", "void", "!Deauth(auth-expired)", "[1,1]", "r", "1"
       ],
       "8": [
-        "2", "?ProbeReq", "!ProbeResp", "[0,1)", "r", "0"
+        "2", "?ProbeReq", "!ProbeResp", "[0,1)", "r", "1"
       ],
       "9": [
-        "2", "?Deauth", "void", "[0,1)", "r", "0"
+        "2", "?Deauth", "void", "[0,1)", "r", "1"
       ],
       "10": [
         "2", "?Disas", "void", "[0,1)", "r", "4"
@@ -44,13 +44,13 @@
         "3", "?AssoReq", "!AssoResp(success) + E1(KD=WPA2|CS=SHA1)", "[0,5)", "r", "3"
       ],
       "12": [
-        "3", "void", "!Disas(inactivity)", "[5,5]", "r", "0"
+        "3", "void", "!Disas(inactivity)", "[5,5]", "r", "1"
       ],
       "13": [
-        "3", "?ProbeReq", "!ProbeResp", "[0,5)", "r", "0"
+        "3", "?ProbeReq", "!ProbeResp", "[0,5)", "r", "1"
       ],
       "14": [
-        "3", "?Deauth", "void", "[0,5)", "r", "0"
+        "3", "?Deauth", "void", "[0,5)", "r", "1"
       ],
       "15": [
         "3", "?Disas", "void", "[0,5)", "r", "4"
@@ -74,13 +74,13 @@
         "4", "?AssoReq", "!Deauth(class3-from-nonass) + Deauth(STA-not-auth)", "[0,+)", "r", "4"
       ],
       "22": [
-        "5", "void", "!Deauth(auth-expired)", "[2,2]", "r", "0"
+        "5", "void", "!Deauth(auth-expired)", "[2,2]", "r", "1"
       ],
       "23": [
-        "5", "?ProbeReq", "!ProbeResp", "[0,2)", "r", "0"
+        "5", "?ProbeReq", "!ProbeResp", "[0,2)", "r", "1"
       ],
       "24": [
-        "5", "?Deauth", "void", "[0,2)", "r", "0"
+        "5", "?Deauth", "void", "[0,2)", "r", "1"
       ],
       "25": [
         "5", "?Disas", "void", "[0,2)", "r", "4"

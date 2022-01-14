@@ -1,7 +1,7 @@
 {
     "name": "pc",
     "l": ["1", "2", "3", "4", "5", "6", "7", "8"],
-    "inputs": ["void", "Start?", "SetPurge?", "SetStandby?", "SetPause?", "LeakageTest?", "ResponseCheck?", "StartMeasurement?", "StartIntegralMeasurement?"],
+    "inputs": ["void", "Start?", "SetPurge?", "SetStandby?", "SetPause?", "LeakageTest?", "ResponseCheck?", "StartMeasurement?", "StartIntegralMeasurement?", "SetZeroPoint?"],
     "outputs": ["void", "SpauState!", "StatusBusy+SpulState!", "StatusBusy+StbyState!", "StbyState!", "StatusBusy+SlecState!", "StatusBusy+SpauState!",
                 "StatusBusy+SegaState!", "StatusBusy+SmgaState!", "StatusBusy+SpulState+SpulState!", "StatusBusy+SintState!"],
     "tran": {

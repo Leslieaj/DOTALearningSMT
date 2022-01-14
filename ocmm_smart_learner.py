@@ -1,9 +1,8 @@
-import pprint
 from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA, OTAToJSON
+from ocmm import OCMMTran, OCMM, buildAssistantOCMM
 from interval import Interval
 from equivalence import ota_equivalent
 from equivalence_simple import OTAEquivalence
-import copy
 import z3
 from os.path import commonprefix
 
@@ -108,32 +107,29 @@ class TestSequence:
         """Initialize data for a test sequence.
 
         tws - list(TimedWord)
-        res - 1, 0, or -1, indicating accept, non-accept, and sink.
+        res - (output, is_sink) 1 or -1, corresponding to accepting or sink state
 
         Keeps a dictionary info, mapping suffixes to test results.
 
+        TODO: add sink tag
         """
         self.tws = tuple(tws)
-
-        self.is_accept = (res == 1)
-        self.is_sink = (res == -1)
+        self.output = res[0]
+        self.is_sink = (res[1] == -1)
         self.info = dict()
 
     def __str__(self):
-        if self.is_accept:
-            res = "Accept\n"
-        elif self.is_sink:
-            res = "Sink\n"
-        else:
-            res = "Non-accept\n"
-        for tws, val in sorted(self.info.items()):
-            res += '  %s: %s\n' % (','.join(str(tw) for tw in tws), val)
-        return res
+        
+        # for tws, val in sorted(self.info.items()):
+        #     res += '  %s: %s\n' % (','.join(str(tw) for tw in tws), val)
+        # return res
+        return "tws: %s\noutput: %s\nis_sink: %s" % \
+                (self.tws, self.output, self.is_sink)
 
     def __repr__(self):
         return str(self)
 
-    def testSuffix(self, ota, tws2, shift=0):
+    def testSuffix(self, mealy, tws2, shift=0):
         """Test the given timed words starting from self.
         
         tws2 - list(TimedWord): suffix to be appended.
@@ -145,7 +141,7 @@ class TestSequence:
             tws2 = (TimedWord(tws2[0].action, tws2[0].time + shift),) + tws2[1:]
         tws = tuple(self.tws + tws2)
         if tws2 not in self.info:
-            self.info[tws2] = ota.runTimedWord(tws)
+            self.info[tws2] = mealy.runTimedWord(tws)
 
         return self.info[tws2]
 
@@ -249,6 +245,11 @@ class Learner:
         # the assignment of the current state.
         self.reset_name[tws] = z3.Bool("r_%d" % len(self.R))
         self.state_name[tws] = z3.Int("s_%d" % len(self.R))
+
+        self.addConstraint1(tws, res)
+        self.addConstraint24(tws, res)
+
+    def addConstraint1(self, tws, res):
         sequence = TestSequence(tws, res)
 
         # Compare the new row with each of the existing rows. For each
@@ -257,61 +258,60 @@ class Learner:
         # inability to distinguish to constraint1_triple.
         for row in self.R:
             if not sequence.is_sink and not self.R[row].is_sink:
-                if sequence.is_accept != self.R[row].is_accept:
+                pairs = generate_pair(row, tws)
+                test_res = dict()
+                test_row = dict()
+                test_col = dict()
+                # Store test result in a matrix, which is convenient for 
+                # observing the result in one row (column)
+                for i, j in pairs:
+                    reset = generate_reset_at_ij(row, tws, i, j)
+                    res = (self.findDistinguishingSuffix(self.R[row], sequence, reset, i, j) is not None)
+                    if i not in test_row:
+                        test_row[i] = {j : res}
+                    else:
+                        test_row[i][j] = res
+                    if j not in test_col:
+                        test_col[j] = {i: res}
+                    else:
+                        test_col[j][i] = res
+                    test_res[(i, j)] = res
+                if all(res for _, res in test_res.items()):
                     self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
                 else:
-                    pairs = generate_pair(row, tws)
-                    test_res = dict()
-                    test_row = dict()
-                    test_col = dict()
-                    # Store test result in a matrix, which is convenient for 
-                    # observing the result in one row (column)
-                    for i, j in pairs:
+                    # If all j can be distinguished by a specific i
+                    for i in test_row:
+                        if all(res for _, res in test_row[i].items()):
+                            row_i_reset = generate_reset_at_i(row, i)
+                            row_f = z3.Implies(self.encodeReset(row_i_reset, self.reset_name),
+                                            self.state_name[row] != self.state_name[tws])
+                            self.constraint1_formula.append(row_f)
+
+                            # Delete used pairs
+                            for ii, jj in list(test_res.keys()):
+                                if i == ii:
+                                    del test_res[(ii, jj)]
+                    for j in test_col:
+                        if all(res for _, res in test_col[j].items()):
+                            col_j_reset = generate_reset_at_i(tws, j)
+                            col_f = z3.Implies(self.encodeReset(col_j_reset, self.reset_name),
+                                            self.state_name[row] != self.state_name[tws])
+                            self.constraint1_formula.append(col_f)
+                            # spec_col.append(self.encodeReset(col_j_reset, self.reset_name))
+                            for ii, jj in list(test_res.keys()):
+                                if j == jj:
+                                    del test_res[(ii, jj)]
+                    for (i, j), res in test_res.items():
                         reset = generate_reset_at_ij(row, tws, i, j)
-                        res = (self.findDistinguishingSuffix(self.R[row], sequence, reset, i, j) is not None)
-                        if i not in test_row:
-                            test_row[i] = {j : res}
+                        if res:
+                            f = z3.Implies(self.encodeReset(reset, self.reset_name),
+                                            self.state_name[row] != self.state_name[tws])
+                            self.constraint1_formula.append(f)
                         else:
-                            test_row[i][j] = res
-                        if j not in test_col:
-                            test_col[j] = {i: res}
-                        else:
-                            test_col[j][i] = res
-                        test_res[(i, j)] = res
-                    if all(res for _, res in test_res.items()):
-                        self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
-                    else:
-                        # If all j can be distinguished by a specific i
-                        for i in test_row:
-                            if all(res for _, res in test_row[i].items()):
-                                row_i_reset = generate_reset_at_i(row, i)
-                                row_f = z3.Implies(self.encodeReset(row_i_reset, self.reset_name),
-                                                self.state_name[row] != self.state_name[tws])
-                                self.constraint1_formula.append(row_f)
+                            self.constraint1_triple.append((row, tws, reset, i, j))
 
-                                # Delete used pairs
-                                for ii, jj in list(test_res.keys()):
-                                    if i == ii:
-                                        del test_res[(ii, jj)]
-                        for j in test_col:
-                            if all(res for _, res in test_col[j].items()):
-                                col_j_reset = generate_reset_at_i(tws, j)
-                                col_f = z3.Implies(self.encodeReset(col_j_reset, self.reset_name),
-                                                self.state_name[row] != self.state_name[tws])
-                                self.constraint1_formula.append(col_f)
-                                # spec_col.append(self.encodeReset(col_j_reset, self.reset_name))
-                                for ii, jj in list(test_res.keys()):
-                                    if j == jj:
-                                        del test_res[(ii, jj)]
-                        for (i, j), res in test_res.items():
-                            reset = generate_reset_at_ij(row, tws, i, j)
-                            if res:
-                                f = z3.Implies(self.encodeReset(reset, self.reset_name),
-                                               self.state_name[row] != self.state_name[tws])
-                                self.constraint1_formula.append(f)
-                            else:
-                                self.constraint1_triple.append((row, tws, reset, i, j))
-
+    def addConstraint24(self, tws, res):
+        sequence = TestSequence(tws, res)
         new_Es = []
         for row in self.R:
             # For each existing row whose last action equals the new row.
@@ -434,7 +434,7 @@ class Learner:
 
         # Add state from R into S.
         for tws in delete_items:
-            if self.checkNewState(tws) and self.ota.runTimedWord(tws) != -1:
+            if self.checkNewState(tws) and self.ota.runTimedWord(tws)[-1] != -1:
                 self.addToS(tws)
 
     def addToS(self, tws):
@@ -480,12 +480,12 @@ class Learner:
         assert tws not in self.R, "Redundant R: %s" % str(tws)
         for i in range(len(tws)+1):
             cur_tws = tws[:i]
-            cur_res = self.ota.runTimedWord(cur_tws)
+            cur_res = self.ota.runTimedWord(cur_tws) # (output, is_sink?)
             if cur_tws not in self.R:
                 self.addRow(cur_tws, cur_res)            
                 is_new_state = self.checkNewState(cur_tws)
 
-                if is_new_state and cur_tws not in self.S and cur_res != -1:
+                if is_new_state and cur_tws not in self.S and cur_res[1] != -1:
                     self.addToS(cur_tws)
 
             if cur_res == -1:
@@ -530,9 +530,10 @@ class Learner:
                     return self.cache[(info1, info2)][(i, j, bb)]
             else:
                 self.cache[(info1, info2)] = dict()
-                    
-        if info1.is_accept != info2.is_accept or info1.is_sink != info2.is_sink:
+
+        if info1.output != info2.output or info1.is_sink != info2.is_sink:
             return tuple()  # empty suffix is distinguishing
+
 
         time1 = info1.getTimeVal(resets)
         time2 = info2.getTimeVal(resets)
@@ -681,7 +682,6 @@ class Learner:
             constraint8 = self.encodeExtraS(state_num)
         else:
             constraint8 = []
-
         print("%d %d %d\n" % (self.constraint1_formula_num,
                     self.constraint2_formula_num, self.constraint4_formula_num))
         self.solver.push()
@@ -728,13 +728,6 @@ class Learner:
             for act in self.actions:
                 transitions[name][act] = dict()
 
-        # List of accept states
-        accepts = set()
-        for row in states:
-            if row != 'sink' and self.R[row].is_accept:
-                accepts.add(states[row])
-
-        accepts = list(accepts)
         # Fill in transitions using R.
         for twR in sorted(self.R):
             if twR == ():
@@ -744,47 +737,48 @@ class Learner:
             start_time = self.R[twR[:-1]].getTimeVal(resets)
             trans_time = start_time + twR[-1].time
             if self.R[twR].is_sink:
-                cur_reset, cur_loc = True, states['sink']
+                cur_reset, cur_loc, cur_out = True, states['sink'], 'sink!'
             else:
-                cur_reset, cur_loc = resets[twR], states[twR]
+                cur_reset, cur_loc, cur_out = resets[twR], states[twR], self.R[twR].output
 
             if trans_time in transitions[prev_loc][twR[-1].action] and\
-                    (cur_reset, cur_loc) != transitions[prev_loc][twR[-1].action][trans_time]:
+                    (cur_reset, cur_loc, cur_out) != transitions[prev_loc][twR[-1].action][trans_time]:
                 print('When adding transition for', twR)
                 raise AssertionError('Conflict at %s (%s, %s)' % (prev_loc, twR[-1].action, trans_time))
-            transitions[prev_loc][twR[-1].action][trans_time] = cur_reset, cur_loc
+            transitions[prev_loc][twR[-1].action][trans_time] = cur_reset, cur_loc, cur_out
 
         # Sink transitions
         for act in self.actions:
-            transitions[states["sink"]][act][0] = (True, states["sink"])
+            transitions[states["sink"]][act][0] = (True, states["sink"], 'sink!')
 
         # From the dictionary of transitions, form the list otaTrans
         otaTrans = []
         for source in transitions:
             for action, trans in transitions[source].items():
                 # Sort and remove duplicates
-                trans = sorted((time, reset, target) for time, (reset, target) in trans.items())
+                trans = sorted((time, reset, target, output) 
+                            for time, (reset, target, output) in trans.items())
                 # If the first transition is not zero, add transition to sink
                 if trans[0][0] != 0:
-                    trans = [(0, True, states["sink"])] + trans
+                    trans = [(0, True, states["sink"], 'sink!')] + trans
 
                 trans_new = [trans[0]]
                 for i in range(1, len(trans)):
-                    time, reset, target = trans[i]
-                    prev_time, prev_reset, prev_target = trans[i-1]
-                    if reset != prev_reset or target != prev_target:
+                    time, reset, target, output = trans[i]
+                    _, prev_reset, prev_target, prev_output = trans[i-1]
+                    if reset != prev_reset or target != prev_target or output != prev_output:
                         trans_new.append(trans[i])
                 trans = trans_new
 
                 # Change to otaTrans.
                 for i in range(len(trans)):
-                    time, reset, target = trans[i]
+                    time, reset, target, output = trans[i]
                     if int(time) == time:
                         min_value, closed_min = int(time), True
                     else:
                         min_value, closed_min = int(time), False
                     if i < len(trans)-1:
-                        time2, reset2, target2 = trans[i+1]
+                        time2, _, _, _ = trans[i+1]
                         if int(time2) == time2:
                             max_value, closed_max = int(time2), False
                         else:
@@ -792,23 +786,22 @@ class Learner:
                         constraint = Interval(min_value, closed_min, max_value, closed_max)
                     else:
                         constraint = Interval(min_value, closed_min, '+', False)
-                    otaTrans.append(OTATran(source, action, constraint, reset, target))
-
+                    otaTrans.append(OCMMTran(source, action, output, constraint, reset, target))
         # Form the location objects
         location_objs = set()
         for tw, loc in states.items():
             if tw == "sink":
                 location_objs.add(Location(loc, False, False, True))
             else:
-                location_objs.add(Location(loc, (loc=="1"), self.R[tw].is_accept, self.R[tw].is_sink))
+                location_objs.add(Location(loc, (loc=="1"), True, self.R[tw].is_sink))
 
-        candidateOTA = OTA(
+        candidateOTA = OCMM(
             name=self.ota.name + '_',
-            sigma=self.actions,
+            inputs=self.actions,
+            outputs=self.ota.outputs,
             locations=location_objs,
             trans=otaTrans,
             init_state='1',
-            accept_states=accepts,
             sink_name=states['sink'])
 
         return True, candidateOTA
@@ -823,7 +816,7 @@ def compute_max_time(candidate):
                     parse_time(tran.constraint.max_value))
     return max_time
 
-def learn_ota(ota, limit=30, verbose=True):
+def learn_ota(ota, limit=30, verbose=True, ctx=False):
     """Overall learning loop.
     
     limit - maximum number of steps.
@@ -832,13 +825,12 @@ def learn_ota(ota, limit=30, verbose=True):
     """
     print("Start to learn ota %s.\n" % ota.name)
     learner = Learner(ota)
-    assist_ota = buildAssistantOTA(ota)
+    assist_ota = buildAssistantOCMM(ota)
     max_time_ota = compute_max_time(ota)
     state_num = 1
     eq_query_num = 0
-    step = 0
-    while True:
-        step += 1
+
+    for step in range(1, limit):
         print("Step", step)
 
         # If size of S has increased beyond state_num, adjust state_num to
@@ -907,9 +899,8 @@ def learn_ota(ota, limit=30, verbose=True):
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
 
-        ota_equiv = OTAEquivalence(max_time, assist_ota, candidate)
+        ota_equiv = OTAEquivalence(max_time, assist_ota, candidate, is_ocmm=True)
         res, ctx_path = ota_equiv.test_equivalent()
-        # res, ctx = ota_equivalent(max_time, assist_ota, candidate)
         eq_query_num += 1
         if not res and verbose:
             print(candidate)
@@ -921,6 +912,8 @@ def learn_ota(ota, limit=30, verbose=True):
             return candidate, len(ota.query), eq_query_num
 
         # ctx_path = tuple(ctx.find_path(assist_ota, candidate))
-        if verbose:
+        if ctx:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
+
+    raise AssertionError
