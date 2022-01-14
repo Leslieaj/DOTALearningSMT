@@ -1,0 +1,30 @@
+digraph g {
+__start0 [label="" shape="none"];
+node [margin=0 width=0.5 shape=circle];
+c0 -> c2 [label="Start/SpauState"];
+c2 -> s3 [label="SetStandby/StatusBusy+StbyState"];
+c2 -> c27 [label="SetPurge/StatusBusy+SpulState\nx:=10"];
+c27 -> c2 [label="SetPause/SpauState"];
+c27 -> c2 [label="to[x]/SpauState"];
+c27 -> s3 [label="SetStandby/StbyState"];
+s3 -> c1 [label="LeakageTest/StatusBusy+SlecState\nx:=10"];
+s3 -> c2 [label="SetPause/StatusBusy+SpauState"];
+s3 -> c1 [label="ResponseCheck/StatusBusy+SegaState\nx:=10"];
+s3 -> c25 [label="StartMeasurement/StatusBusy+SmgaState"];
+s3 -> c1 [label="SetPurge/StatusBusy+SpulState+SpulState\nx:=10"];
+c1 -> c2 [label="SetPause/SpauState"];
+c1 -> s3 [label="SetStandby/StbyState"];
+c1 -> s3 [label="to[x]/StbyState"];
+c25 -> s3 [label="SetStandby/StatusBusy+StbyState"];
+c25 -> c2 [label="SetPause/StatusBusy+SpauState"];
+c25 -> s4 [label="StartIntegralMeasurement/StatusBusy+SintState"];
+c25 -> c32 [label="SetZeroPoint/StatusBusy+SmgaState\nx:=10"];
+s4 -> c25 [label="StartIntegralMeasurement/StatusBusy+SmgaState"];
+s4 -> s3 [label="SetStandby/StatusBusy+StbyState"];
+s4 -> c2 [label="SetPause/StatusBusy+SpauState"];
+c32 -> c2 [label="SetPause/StatusBusy+SpauState"];
+c32 -> s3 [label="SetStandby/StatusBusy+StbyState"];
+c32 -> c25 [label="to[x]/StatusBusy+SmgaState"];
+__start0 -> c0;
+}
+

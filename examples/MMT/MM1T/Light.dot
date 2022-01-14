@@ -1,0 +1,12 @@
+digraph g {
+__start0 [label="" shape="none"];
+node [margin=0 width=0.5 shape=circle];
+c0 -> c1 [label="press x:=5"];
+c1 -> c0 [label="release"];
+c1 -> s0 [label="to[x]/beep x:=5"];
+s0 -> c0 [label="release/touch"]
+s0 -> c2 [label="to[x]/starthold"];
+c2 -> c0 [label="release/endhold"];
+__start0 -> c0;
+}
+

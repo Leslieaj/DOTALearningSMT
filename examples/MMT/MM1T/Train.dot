@@ -1,0 +1,13 @@
+digraph g {
+__start0 [label="" shape="none"];
+node [margin=0 width=0.5 shape=circle];
+c0 -> c1 [label="start x:=5"];
+c1 -> c2 [label="to[x]/appr\n x:=10"];
+c2 -> c3 [label="to[x]/enter\n x:=3"];
+c2 -> c4 [label="stop"];
+c3 -> c0 [label="to[x]/leave"];
+c4 -> c5 [label="go x:=7"];
+c5 -> c3 [label="to[x]/enter\n x:=3"];
+__start0 -> c0;
+}
+
