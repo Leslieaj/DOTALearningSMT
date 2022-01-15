@@ -2,7 +2,7 @@ from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA, OTAToJSON
 from ocmm import OCMMTran, OCMM, buildAssistantOCMM
 from interval import Interval
 from equivalence import ota_equivalent
-from equivalence_simple import OTAEquivalence
+from equivalence_ocmm import OCMMEquivalence
 import z3
 from os.path import commonprefix
 
@@ -829,7 +829,7 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
     max_time_ota = compute_max_time(ota)
     state_num = 1
     eq_query_num = 0
-
+    ota.outputs = assist_ota.outputs
     for step in range(1, limit):
         print("Step", step)
         # If size of S has increased beyond state_num, adjust state_num to
@@ -897,10 +897,8 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
 
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
-        print("Test equivalence")
-        ota_equiv = OTAEquivalence(max_time, assist_ota, candidate, is_ocmm=True)
+        ota_equiv = OCMMEquivalence(max_time, assist_ota, candidate, is_ocmm=True)
         res, ctx_path = ota_equiv.test_equivalent()
-        print("Finished equivalence")
         eq_query_num += 1
         if not res and verbose:
             print(candidate)
@@ -911,7 +909,6 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
             # break
             return candidate, len(ota.query), eq_query_num
 
-        # ctx_path = tuple(ctx.find_path(assist_ota, candidate))
         if ctx:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
