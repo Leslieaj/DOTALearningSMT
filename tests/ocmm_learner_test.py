@@ -8,12 +8,12 @@ from pstats import Stats
 class OCMMLearner(unittest.TestCase):
     def testOCMMLearner(self):
         test_cases = [
-            "Light", # 0.457
-            "Train", # 0.996
-            "AKM", # 1.855
-            "CAS", # 39.933
-            "TCP", # 2.634
-            "PC", # 11.381
+            "Light", # 0.388
+            "Train", # 0.578
+            "AKM", # 2.274
+            "CAS", # 17.515
+            "TCP", # 2.223
+            "PC", # 7.496
         ]
 
         profile = False
@@ -26,7 +26,7 @@ class OCMMLearner(unittest.TestCase):
                 print("file name %s" % f)
                 o = ocmm.buildOCMM("./examples/MMT/OCMMs/%s.json" % f)
                 start_time = time.time()
-                learned_ota, mem_num, eq_num = ocmm_smart_learner.learn_ota(o, limit=100, verbose=False)                
+                _, mem_num, eq_num = ocmm_smart_learner.learn_ocmm(o, limit=100, verbose=False)                
                 end_time = time.time()
                 output_file.write("Test %s: %.3f (s) Membership query: %d Equivalence query: %d\n" 
                             % (f, end_time - start_time, mem_num, eq_num))
