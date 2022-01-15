@@ -85,9 +85,6 @@ class OTAEquivalence:
         # Mapping from n to region
         self.region_dict = dict()
 
-        # Indicating the type of input automata
-        self.is_ocmm = is_ocmm
-
     def int_to_region(self, n):
         if n in self.region_dict:
             return self.region_dict[n]
@@ -163,14 +160,9 @@ class OTAEquivalence:
         but B side is not accepting, or vice versa.
         
         """
-        if self.is_ocmm:
-            path = self.find_path(c)
-            return self.ota_A.runTimedWord(path)[0] !=\
-                self.ota_B.runTimedWord(path)[0]
-        else:
-            A_accept = c.loc_A in self.ota_A.accept_states
-            B_accept = c.loc_B in self.ota_B.accept_states
-            return A_accept != B_accept
+        A_accept = c.loc_A in self.ota_A.accept_states
+        B_accept = c.loc_B in self.ota_B.accept_states
+        return A_accept != B_accept
     
     def immediate_asucc(self, c, action):
         """Perform an immediate action, without further time delays."""
