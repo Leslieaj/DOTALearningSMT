@@ -119,12 +119,7 @@ class TestSequence:
         self.info = dict()
 
     def __str__(self):
-        
-        # for tws, val in sorted(self.info.items()):
-        #     res += '  %s: %s\n' % (','.join(str(tw) for tw in tws), val)
-        # return res
-        return "tws: %s\noutput: %s\nis_sink: %s" % \
-                (self.tws, self.output, self.is_sink)
+        return "output: %s\nis_sink: %s\n" % (self.output, self.is_sink)
 
     def __repr__(self):
         return str(self)
@@ -446,11 +441,10 @@ class Learner:
                 "addToS: tws should be in R and not in S"
         self.S[tws] = self.R[tws]
 
-        if self.ota.runTimedWord(tws) != -1:
-            for act in self.actions:
-                cur_tws = tws + (TimedWord(act, 0),)
-                if cur_tws not in self.R:
-                    self.addPath(cur_tws)
+        for act in self.actions:
+            cur_tws = tws + (TimedWord(act, 0),)
+            if cur_tws not in self.R:
+                self.addPath(cur_tws)
 
     def addPossibleS(self, tws):
         """Check if tws can be added into S. If not, add
@@ -488,7 +482,7 @@ class Learner:
                 if is_new_state and cur_tws not in self.S and cur_res[1] != -1:
                     self.addToS(cur_tws)
 
-            if cur_res == -1:
+            if cur_res[1] == -1:
                 break
 
     def checkNewState(self, tws):
@@ -531,9 +525,16 @@ class Learner:
             else:
                 self.cache[(info1, info2)] = dict()
 
-        if info1.output != info2.output or info1.is_sink != info2.is_sink:
+        
+        if info1.is_sink != info2.is_sink: # accepting or sink
             return tuple()  # empty suffix is distinguishing
 
+        # Different output from same input
+        if info1.tws and info2.tws and info1.tws[-1] == info2.tws[-1] and info1.output != info2.output:
+            return tuple()
+        
+        if E is None and not self.E:
+            return None
 
         time1 = info1.getTimeVal(resets)
         time2 = info2.getTimeVal(resets)
@@ -793,8 +794,7 @@ class Learner:
             if tw == "sink":
                 location_objs.add(Location(loc, False, False, True))
             else:
-                location_objs.add(Location(loc, (loc=="1"), True, self.R[tw].is_sink))
-
+                location_objs.add(Location(loc, (loc=="1"), not self.R[tw].is_sink, self.R[tw].is_sink))
         candidateOTA = OCMM(
             name=self.ota.name + '_',
             inputs=self.actions,
@@ -832,7 +832,6 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
 
     for step in range(1, limit):
         print("Step", step)
-
         # If size of S has increased beyond state_num, adjust state_num to
         # that size.
         if state_num < len(learner.S):
@@ -898,9 +897,10 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
 
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
-
+        print("Test equivalence")
         ota_equiv = OTAEquivalence(max_time, assist_ota, candidate, is_ocmm=True)
         res, ctx_path = ota_equiv.test_equivalent()
+        print("Finished equivalence")
         eq_query_num += 1
         if not res and verbose:
             print(candidate)
@@ -915,5 +915,4 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
         if ctx:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
-
     raise AssertionError

@@ -60,7 +60,9 @@ class Configuration:
     def __eq__(self, other):
         return self.loc_A == other.loc_A and self.region_A == other.region_A and \
                self.loc_B == other.loc_B and self.region_B == other.region_B and \
-               self.frac_A == other.frac_A and self.frac_B == other.frac_B
+               (self.frac_A == other.frac_A and self.frac_B == other.frac_B or \
+                self.frac_A < other.frac_A and self.frac_B < other.frac_B or \
+                self.frac_A > other.frac_A and self.frac_B > other.frac_B)
 
     def __str__(self):
         return "loc_A: %s region_A: %s loc_B: %s region_B: %s frac_A: %s frac_B: %s \n(pre: %s action: %s)" % (
@@ -114,14 +116,14 @@ class OTAEquivalence:
         """
         if self.is_inf(c.region_A):
             if self.is_point(c.region_B):
-                return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, None, dec_half), dec_half
+                return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, dec_zero, dec_half), dec_half
             else:
-                return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, None, dec_zero), 1 - c.frac_B
+                return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, dec_zero, dec_zero), 1 - c.frac_B
         elif self.is_inf(c.region_B):
             if self.is_point(c.region_A):
-                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, dec_half, None), dec_half
+                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, dec_half, dec_zero), dec_half
             else:
-                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, dec_zero, None), 1 - c.frac_A
+                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, dec_zero, dec_zero), 1 - c.frac_A
         elif self.is_point(c.region_A) and self.is_point(c.region_B):
             return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B+1, dec_half, dec_half), dec_half
         elif self.is_point(c.region_A) and self.is_frac(c.region_B):

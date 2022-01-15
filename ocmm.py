@@ -99,6 +99,40 @@ class OCMM:
         res += str(self.sink_name) + "\n"
         return res
 
+    def runTimedWordTrace(self, itws):
+        """Execute the given timed word over inputs.
+        itws : list of TimedWord over inputs.
+        Return the output and type of state (accept or sink). 
+        
+        (Currently only implement the deterministic case.)
+        """
+        if itws in self.query:
+            return self.query[itws]
+
+        if not itws: # empty output
+            return [], 1
+        trace = []
+        cur_state, cur_time = self.init_state, 0
+        output = None
+        for itw in itws:
+            for tran in self.trans:
+                output = tran.pass_input(cur_state, itw.action, cur_time + itw.time)
+                if output != "sink!":
+                    trace.append(output)
+                    cur_state = tran.target
+                    if tran.reset:
+                        cur_time = 0
+                    else:
+                        cur_time += itw.time
+                    break
+            if output == "sink!":
+                trace.append("sink!")
+                self.query[itws] = (trace, -1)
+                return trace, -1
+
+        self.query[itws] = (trace, 1)
+        return trace, 1
+    
     def runTimedWord(self, itws):
         """Execute the given timed word over inputs.
         itws : list of TimedWord over inputs.
@@ -130,7 +164,6 @@ class OCMM:
 
         self.query[itws] = (output, 1)
         return output, 1
-
 
 def buildOCMM(jsonfile):
     """Build the teacher OTA from a json file."""
