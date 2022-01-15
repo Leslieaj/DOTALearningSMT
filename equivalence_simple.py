@@ -18,7 +18,7 @@ def round_div_2(r):
     if r == Decimal(1):
         return Decimal('0.5')
 
-    s = str(r)
+    s = '{:f}'.format(r)
     num_digit = len(s) - 2
     res = r * (Decimal(10) ** num_digit)
     if res % 2 == 0 or res == 1:
@@ -61,8 +61,8 @@ class Configuration:
         return self.loc_A == other.loc_A and self.region_A == other.region_A and \
                self.loc_B == other.loc_B and self.region_B == other.region_B and \
                (self.frac_A == other.frac_A and self.frac_B == other.frac_B or \
-                self.frac_A < other.frac_A and self.frac_B < other.frac_B or \
-                self.frac_A > other.frac_A and self.frac_B > other.frac_B)
+                self.frac_A < self.frac_B and other.frac_A < other.frac_B or \
+                self.frac_A > self.frac_B and other.frac_A > other.frac_B)
 
     def __str__(self):
         return "loc_A: %s region_A: %s loc_B: %s region_B: %s frac_A: %s frac_B: %s \n(pre: %s action: %s)" % (
