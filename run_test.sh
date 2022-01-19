@@ -15,5 +15,5 @@ python stat.py $1 $1-$i.json
 done
 
 # Statistics
-python -c "from main import analysis; analysis(\""./result/$1.txt"\")" 
+python -c "from stat import analysis; analysis(\""./result/$1.txt"\")" 
 
