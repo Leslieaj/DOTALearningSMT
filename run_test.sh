@@ -11,9 +11,9 @@ fi
 
 for i in $(seq 1 10) # iterate files
 do
-python stat.py $1 $1-$i.json
+python stats.py $1 $1-$i.json
 done
 
 # Statistics
-python -c "from stat import analysis; analysis(\""./result/$1.txt"\")" 
+python -c "import stats; stats.parse_data(\""./result/$1.txt"\")" 
 
