@@ -30,6 +30,8 @@ dec_zero = Decimal(0)
 dec_half = Decimal(0.5)
 dec_one = Decimal(1)
 
+LESS, EQ, GREATER = range(3)
+
 class Configuration:
     """A configuration consists of states for the left and right timed
     automata. Each state consists of location and region. If both sides
@@ -69,8 +71,14 @@ class Configuration:
             self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B, self.pre, self.action)
 
     def __hash__(self):
-        return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B))
-
+        if self.frac_A < self.frac_B:
+            return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, LESS))
+        elif self.frac_A == self.frac_B:
+            return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, EQ))
+        elif self.frac_A > self.frac_B:
+            return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, GREATER))
+        else:
+            raise ValueError
 
 class OTAEquivalence:
     def __init__(self, max_value, ota_A, ota_B, is_ocmm=False):
