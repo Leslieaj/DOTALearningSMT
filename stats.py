@@ -15,7 +15,7 @@ def smt_learn_dota(folder_name, file_name):
         mems, eqs, timer = [], [], []
         trans_num = 0
         print("file name: %s", file_name)
-        o = buildOTA("./examples/%s/%s" % (folder_name, file_name))
+        o = buildOTA("./examples/DOTA/%s/%s" % (folder_name, file_name))
         trans_num += len(o.trans)
         start_time = time.perf_counter()
         learned_ota, mem_num, eq_num = learn_ota(o, limit=150, verbose=False)
@@ -71,6 +71,8 @@ if __name__ == "__main__":
     assert len(sys.argv) == 4, "Wrong arguments %s" % sys.argv
     folder_name, file_name = str(sys.argv[2]), str(sys.argv[3])
     if sys.argv[1] == "dota":
+        print("folder name", folder_name, "file_name", file_name)
+        file_name = file_name.split("/")[-1]
         smt_learn_dota(folder_name, file_name)
     elif sys.argv[1] == "ocmm":
         smt_learn_ocmm(folder_name, file_name)
