@@ -1,7 +1,6 @@
 #!/bin/bash
-
+> result/OCMMs.txt
 for filename in examples/MMT/OCMMs/*.json; do
     echo "$filename"
-    python stats.py OCMMs $filename
+    python stats.py ocmm OCMMs $filename
 done
-# python -m unittest tests.ocmm_learner_test

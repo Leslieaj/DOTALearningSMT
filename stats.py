@@ -44,8 +44,8 @@ def smt_learn_ocmm(folder_name, file_name):
         eqs.append(eq_num)
         loc = len(learned_ota.locations) - 1
         locs += loc
-        output_file.write("Test %s: %s, Membership query: %d (%d), Equivalence query: %d, Locations: %d, Transitions: %d Inputs: %d\n" 
-                    % (file_name, end_time - start_time, mem_num, o.mq_num, eq_num, loc, trans_num, o.comp_input()))
+        output_file.write("Test %s: %s, Membership query: %d, Equivalence query: %d, Locations: %d, Transitions: %d\n" 
+                    % (file_name, end_time - start_time, mem_num, eq_num, loc, trans_num))
         output_file.flush()
 
 def parse_data(file_name):
@@ -68,7 +68,11 @@ def analyze(file_name):
 
 
 if __name__ == "__main__":
-    assert len(sys.argv) == 3, "Wrong arguments %s" % sys.argv
-    folder_name, file_name = str(sys.argv[1]), str(sys.argv[2])
-    # smt_learn_dota(folder_name, file_name)
-    smt_learn_ocmm(folder_name, file_name)
+    assert len(sys.argv) == 4, "Wrong arguments %s" % sys.argv
+    folder_name, file_name = str(sys.argv[2]), str(sys.argv[3])
+    if sys.argv[1] == "dota":
+        smt_learn_dota(folder_name, file_name)
+    elif sys.argv[1] == "ocmm":
+        smt_learn_ocmm(folder_name, file_name)
+    else:
+        print("You should input either `dota` or `ocmm`, e.g.\n ./run_dota dota 3_2_10")

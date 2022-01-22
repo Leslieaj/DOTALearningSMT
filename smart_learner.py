@@ -616,9 +616,9 @@ class Learner:
         formulas = []
         for r, info in self.R.items():
             if info.is_sink:
-                if r not in self.sink_constraint:
-                    self.sink_constraint.add(r)
-                    formulas.append(self.reset_name[r] == True)
+                # if r not in self.sink_constraint:
+                #     self.sink_constraint.add(r)
+                formulas.append(self.reset_name[r] == True)
 
         return formulas
 

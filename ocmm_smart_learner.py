@@ -908,7 +908,7 @@ def learn_ocmm(ota, limit=30, verbose=True, ctx=False):
             print("Finished in %s steps " % step)
             # OTAToJSON(candidate, "candidate")
             # break
-            return candidate, len(ota.query), eq_query_num
+            return candidate, len(ota.query1), eq_query_num
 
         if ctx:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))

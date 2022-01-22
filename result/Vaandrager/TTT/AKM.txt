@@ -1,0 +1,68 @@
+-------------- ExampleMM1TLearner's Profile --------------------
+learning rounds [#]: 3
+Learning [ms]: 13135, (13.135 s)
+Searching for counterexample [ms]: 5462174, (5462.174 s)
+
+Membership Queries to SUL [queries]: 68
+Conformance Queries to SUL [queries]: 1034
+-------------------------------------------------------
+
+==========================================
+ ExampleMM1TLearner: AKM
+ Learning Algorithm: ttt
+ Testing Algorithm: RandomWord
+------------------------------------------
+         Hypothesis Learning              
+------------------------------------------
+ Membership Queries: 68
+  - Tree Queries: 25
+  - SUL Queries: 43
+  - Delay Queries: 0
+------------------------------------------
+         Conformance Testing              
+------------------------------------------
+ Membership Queries: 1034
+  - Tree Queries: 182
+  - SUL Queries: 852
+  - Delay Queries: 0
+==========================================
+ Equivalence Queries: 3
+ SUL Resets: 5483
+ SUL Inputs: 30454
+==========================================
+
+Learned the following MM1T of (4) states using (6) inputs.
+digraph g {
+
+	s0 [shape="circle" label="s0"];
+	s1 [shape="circle" label="s1"];
+	s2 [shape="circle" label="s2"];
+	s3 [shape="circle" label="s3"];
+	s0 -> s1 [label="Auth / Auth(success)
+set-timer(500ms)"];
+	s0 -> s0 [label="AssoReq / Deauth(STA-not-auth)"];
+	s0 -> s2 [label="Disas"];
+	s0 -> s0 [label="ProbeReq / ProbeResp"];
+	s1 -> s1 [label="Auth / Auth(success)
+set-timer(500ms)"];
+	s1 -> s3 [label="AssoReq / AssoResp(success);E1(KD=WPA2|CS=SHA1)
+set-timer(2.5s)"];
+	s1 -> s0 [label="Deauth"];
+	s1 -> s2 [label="Disas"];
+	s1 -> s0 [label="ProbeReq / ProbeResp"];
+	s1 -> s0 [label="timeout / Deauth(auth-expired)"];
+	s2 -> s1 [label="Auth / Auth(success)
+set-timer(500ms)"];
+	s2 -> s2 [label="AssoReq / Deauth(class3-from-nonass);Deauth(STA-not-auth)"];
+	s2 -> s2 [label="ProbeReq / ProbeResp"];
+	s3 -> s1 [label="Auth / Auth(success)
+set-timer(1.0s)"];
+	s3 -> s3 [label="AssoReq / AssoResp(success);E1(KD=WPA2|CS=SHA1)
+set-timer(2.5s)"];
+	s3 -> s0 [label="Deauth"];
+	s3 -> s2 [label="Disas"];
+	s3 -> s0 [label="ProbeReq / ProbeResp"];
+	s3 -> s0 [label="timeout / Disas(inactivity)"];
+
+__start0 [label="" shape="none" width="0" height="0"];
+__start0 -> s0;

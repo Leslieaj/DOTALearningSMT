@@ -11,7 +11,7 @@ fi
 
 for i in $(seq 1 10) # iterate files
 do
-python stats.py $1 $1-$i.json
+python stats.py dota $1 $1-$i.json
 done
 
 # Statistics

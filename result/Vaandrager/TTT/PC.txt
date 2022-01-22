@@ -1,0 +1,78 @@
+-------------- ExampleMM1TLearner's Profile --------------------
+learning rounds [#]: 4
+Learning [ms]: 19636, (19.636 s)
+Searching for counterexample [ms]: 28472, (28.472 s)
+
+Membership Queries to SUL [queries]: 317
+Conformance Queries to SUL [queries]: 1276
+-------------------------------------------------------
+
+==========================================
+ ExampleMM1TLearner: PC
+ Learning Algorithm: ttt
+ Testing Algorithm: RandomWord
+------------------------------------------
+         Hypothesis Learning              
+------------------------------------------
+ Membership Queries: 317
+  - Tree Queries: 210
+  - SUL Queries: 107
+  - Delay Queries: 0
+------------------------------------------
+         Conformance Testing              
+------------------------------------------
+ Membership Queries: 1276
+  - Tree Queries: 1204
+  - SUL Queries: 72
+  - Delay Queries: 0
+==========================================
+ Equivalence Queries: 4
+ SUL Resets: 341
+ SUL Inputs: 1619
+==========================================
+
+Learned the following MM1T of (8) states using (10) inputs.
+digraph g {
+
+	s0 [shape="circle" label="s0"];
+	s1 [shape="circle" label="s1"];
+	s2 [shape="circle" label="s2"];
+	s3 [shape="circle" label="s3"];
+	s4 [shape="circle" label="s4"];
+	s5 [shape="circle" label="s5"];
+	s6 [shape="circle" label="s6"];
+	s7 [shape="circle" label="s7"];
+	s0 -> s1 [label="ُStart / SpauState"];
+	s1 -> s3 [label="SetStandby / StatusBusy+StbyState"];
+	s1 -> s2 [label="SetPurge / StatusBusy+SpulState
+set-timer(10ms)"];
+	s2 -> s3 [label="SetStandby / StbyState"];
+	s2 -> s1 [label="SetPause / SpauState"];
+	s2 -> s1 [label="timeout / SpauState"];
+	s3 -> s5 [label="SetPurge / StatusBusy+SpulState+SpulState
+set-timer(10ms)"];
+	s3 -> s1 [label="SetPause / StatusBusy+SpauState"];
+	s3 -> s5 [label="LeakageTest / StatusBusy+SlecState
+set-timer(10ms)"];
+	s3 -> s5 [label="ResponseCheck / StatusBusy+SegaState
+set-timer(10ms)"];
+	s3 -> s4 [label="StartMeasurement / StatusBusy+SmgaState"];
+	s4 -> s3 [label="SetStandby / StatusBusy+StbyState"];
+	s4 -> s1 [label="SetPause / StatusBusy+SpauState"];
+	s4 -> s7 [label="StartIntegralMeasurement / StatusBusy+SintState"];
+	s4 -> s6 [label="SetZeroPoint / StatusBusy+SmgaState
+set-timer(10ms)"];
+	s5 -> s3 [label="SetStandby / StbyState"];
+	s5 -> s1 [label="SetPause / SpauState"];
+	s5 -> s3 [label="timeout / StbyState"];
+	s6 -> s3 [label="SetStandby / StatusBusy+StbyState"];
+	s6 -> s1 [label="SetPause / StatusBusy+SpauState"];
+	s6 -> s4 [label="timeout / StatusBusy+SmgaState"];
+	s7 -> s3 [label="SetStandby / StatusBusy+StbyState"];
+	s7 -> s1 [label="SetPause / StatusBusy+SpauState"];
+	s7 -> s4 [label="StartIntegralMeasurement / StatusBusy+SmgaState"];
+
+__start0 [label="" shape="none" width="0" height="0"];
+__start0 -> s0;
+
+}

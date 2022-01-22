@@ -3,6 +3,7 @@
 import json
 from interval import Interval, complement_intervals
 from ota import Location
+from os.path import commonprefix
 
 class OCMMTran:
     """Represnt a transition in a Mealy machine with one clock"""
@@ -64,9 +65,11 @@ class OCMM:
         self.sink_name = str(len(locations) + 1)
 
         # Store the runIOTimedWord result
-        self.query = {tuple(): (None, 1)}
+        # For membership query
+        self.query1 = {tuple(): (None, 1)}
+        # For reset query
+        self.query2 = {tuple(): (None, 1)}
         # Record #membership query
-        self.mq_num = 1
         # Create index of transitions
         self.trans_dict = dict()
         for action in self.sigma:
@@ -144,11 +147,11 @@ class OCMM:
         
         (Currently only implement the deterministic case.)
         """
-        if itws in self.query:
-            return self.query[itws]
+        if itws in self.query1:
+            return self.query1[itws]
         output = None
         cur_state, cur_time = self.init_state, 0
-        print("before length of query:%d mq_num:%d length of tws: %d" % (len(self.query), self.mq_num, len(itws)))
+
         for i, itw in enumerate(itws):
             for tran in self.trans:
                 output = tran.pass_input(cur_state, itw.action, cur_time + itw.time)
@@ -161,19 +164,16 @@ class OCMM:
                     break
             if output is None: # not complete transition
                 output = "sink!"
-            if itws[:i+1] not in self.query:
-                self.query[itws[:i+1]] = (output, (-1 if output == "sink!" else 1))
+            if itws[:i+1] not in self.query2:
+                self.query2[itws[:i+1]] = (output, (-1 if output == "sink!" else 1))
             if output == "sink!": # always sink in the future
                 for j in range(i+1, len(itws)):
-                    self.query[itws[:j+1]] = self.query[itws[:i+1]]
+                    self.query2[itws[:j+1]] = self.query2[itws[:i+1]]
                 break
 
-        self.mq_num += 1
-        print("After length of query:%d mq_num:%d" % (len(self.query), self.mq_num))
-        return self.query[itws]
-
-    def comp_input(self):
-        return sum([len(t) for t in self.query])
+        out, sink = self.query2[itws]
+        self.query1[itws] = (out, sink)
+        return self.query1[itws]
 
 def buildOCMM(jsonfile):
     """Build the teacher OTA from a json file."""

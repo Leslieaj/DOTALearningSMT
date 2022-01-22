@@ -43,7 +43,6 @@ class Configuration:
     def __eq__(self, other):
         return self.loc_A == other.loc_A and self.region_A == other.region_A and \
                self.loc_B == other.loc_B and self.region_B == other.region_B and \
-               self.output_A == other.output_A and self.output_B == other.output_B and \
                (self.frac_A == other.frac_A and self.frac_B == other.frac_B or \
                 self.frac_A < self.frac_B and other.frac_A < other.frac_B or \
                 self.frac_A > self.frac_B and other.frac_A > other.frac_B)
@@ -55,14 +54,14 @@ class Configuration:
 
     def __hash__(self):
         if self.frac_A < self.frac_B:
-            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
-                self.loc_B, self.region_B, self.output_B, LESS))
+            return hash(("CONFIG", self.loc_A, self.region_A, 
+                self.loc_B, self.region_B, LESS))
         elif self.frac_A == self.frac_B:
-            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
-                self.loc_B, self.region_B, self.output_B, EQ))
+            return hash(("CONFIG", self.loc_A, self.region_A, 
+                self.loc_B, self.region_B, EQ))
         elif self.frac_A > self.frac_B:
-            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
-                self.loc_B, self.region_B, self.output_B, GREATER))
+            return hash(("CONFIG", self.loc_A, self.region_A, 
+                self.loc_B, self.region_B, GREATER))
         else:
             raise ValueError
 

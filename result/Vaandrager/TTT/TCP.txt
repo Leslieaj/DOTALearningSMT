@@ -1,0 +1,73 @@
+-------------- ExampleMM1TLearner's Profile --------------------
+learning rounds [#]: 8
+Learning [ms]: 23664, (23.664 s)
+Searching for counterexample [ms]: 97661, (97.661 s)
+
+Membership Queries to SUL [queries]: 550
+Conformance Queries to SUL [queries]: 1783
+-------------------------------------------------------
+
+==========================================
+ ExampleMM1TLearner: TCP
+ Learning Algorithm: ttt
+ Testing Algorithm: RandomWord
+------------------------------------------
+         Hypothesis Learning              
+------------------------------------------
+ Membership Queries: 550
+  - Tree Queries: 449
+  - SUL Queries: 101
+  - Delay Queries: 0
+------------------------------------------
+         Conformance Testing              
+------------------------------------------
+ Membership Queries: 1783
+  - Tree Queries: 1599
+  - SUL Queries: 184
+  - Delay Queries: 0
+==========================================
+ Equivalence Queries: 8
+ SUL Resets: 628
+ SUL Inputs: 3265
+==========================================
+
+Learned the following MM1T of (11) states using (9) inputs.
+digraph g {
+
+	s0 [shape="circle" label="s0"];
+	s1 [shape="circle" label="s1"];
+	s2 [shape="circle" label="s2"];
+	s3 [shape="circle" label="s3"];
+	s4 [shape="circle" label="s4"];
+	s5 [shape="circle" label="s5"];
+	s6 [shape="circle" label="s6"];
+	s7 [shape="circle" label="s7"];
+	s8 [shape="circle" label="s8"];
+	s9 [shape="circle" label="s9"];
+	s10 [shape="circle" label="s10"];
+	s0 -> s2 [label="OPEN(PASSIVE)"];
+	s0 -> s1 [label="OPEN(ACTIVE) / SYN"];
+	s1 -> s0 [label="CLOSE"];
+	s1 -> s3 [label="SYN / ACK"];
+	s1 -> s4 [label="SYN+ACK / ACK"];
+	s2 -> s0 [label="CLOSE"];
+	s2 -> s3 [label="SYN / SYN+ACK"];
+	s2 -> s1 [label="SEND / SYN"];
+	s3 -> s6 [label="CLOSE / FIN"];
+	s3 -> s4 [label="ACK"];
+	s4 -> s6 [label="CLOSE / FIN"];
+	s4 -> s5 [label="FIN / ACK"];
+	s5 -> s9 [label="CLOSE / FIN"];
+	s6 -> s8 [label="ACK"];
+	s6 -> s7 [label="FIN / ACK"];
+	s7 -> s10 [label="ACK
+set-timer(20ms)"];
+	s8 -> s10 [label="FIN / ACK
+set-timer(20ms)"];
+	s9 -> s0 [label="ACK"];
+	s10 -> s0 [label="timeout"];
+
+__start0 [label="" shape="none" width="0" height="0"];
+__start0 -> s0;
+
+}
