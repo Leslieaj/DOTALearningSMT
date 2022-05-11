@@ -69,7 +69,7 @@ class Configuration:
             self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B, self.pre, self.action)
 
     def __hash__(self):
-        return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B))
+        return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A < self.frac_B))
 
 
 class OTAEquivalence:

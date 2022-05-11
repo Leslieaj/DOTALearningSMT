@@ -66,6 +66,9 @@ class OCMM:
         # Store the runIOTimedWord result
         self.query = dict()
 
+        self.steps = 0
+        self.resets = 0
+
         # Create index of transitions
         self.trans_dict = dict()
         for action in self.sigma:
@@ -142,7 +145,7 @@ class OCMM:
         """
         if itws in self.query:
             return self.query[itws]
-
+        reset = 0
         output = None
         if not itws:
             return output, 1
@@ -151,6 +154,8 @@ class OCMM:
             for tran in self.trans:
                 output = tran.pass_input(cur_state, itw.action, cur_time + itw.time)
                 if output is not None:
+                    if tran.reset:
+                        reset += 1
                     cur_state = tran.target
                     if tran.reset:
                         cur_time = 0
@@ -159,10 +164,10 @@ class OCMM:
                     break
             if output is None or output == "sink!":
                 return "sink!", -1
-            elif output == "sink!":
-                return output, -1
-
+        print("reset: %s input: %s" % (reset, len(itws)))
         self.query[itws] = (output, 1)
+        self.steps += len(itws)
+        self.resets += reset
         return output, 1
 
 def buildOCMM(jsonfile):

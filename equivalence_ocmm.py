@@ -9,7 +9,7 @@ from decimal import Decimal
 import ota
 import interval
 from equivalence_simple import round_div_2, dec_zero, \
-    dec_half, dec_one, Configuration
+    dec_half, dec_one
 
 class Configuration:
     """A configuration consists of states for the left and right timed
@@ -178,7 +178,8 @@ class OCMMEquivalence:
         new_frac_A = dec_zero if A_tran.reset else c.frac_A
         new_region_B = 0 if B_tran.reset else c.region_B
         new_frac_B = dec_zero if B_tran.reset else c.frac_B
-        return Configuration(A_tran.target, new_region_A, A_tran.output, 
+        seq= self.find_path(c)
+        return Configuration(A_tran.target, new_region_A, self.ocmm_A.runTimedWord, 
                 B_tran.target, new_region_B, B_tran.output, 
                     new_frac_A, new_frac_B, pre=c, action=action)
 
@@ -217,6 +218,7 @@ class OCMMEquivalence:
                 return True, None
 
             c = to_explore.get()
+            assert c.output_A == c.output_B
             if c in explored:
                 continue
             explored.add(c)

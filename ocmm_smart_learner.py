@@ -906,6 +906,7 @@ def learn_ocmm(ota, limit=30, verbose=True, ctx=False):
         if res:
             print(candidate)
             print("Finished in %s steps " % step)
+            print("Resets: %s, Inputs: %s" % (learner.ota.resets, learner.ota.steps))
             # OTAToJSON(candidate, "candidate")
             # break
             return candidate, len(ota.query), eq_query_num
