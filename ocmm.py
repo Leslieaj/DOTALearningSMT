@@ -64,11 +64,9 @@ class OCMM:
         self.sink_name = str(len(locations) + 1)
 
         # Store the runIOTimedWord result
-        self.query = dict()
-
-        self.steps = 0
-        self.resets = 0
-
+        self.query = {tuple(): (None, 1)}
+        # Record #membership query
+        self.mq_num = 1
         # Create index of transitions
         self.trans_dict = dict()
         for action in self.sigma:
@@ -109,32 +107,35 @@ class OCMM:
         
         (Currently only implement the deterministic case.)
         """
-        if itws in self.query:
-            return self.query[itws]
-
         if not itws: # empty output
-            return [], 1
+            return tuple(), 1
+        
         trace = []
         cur_state, cur_time = self.init_state, 0
         output = None
+        is_sink = False
         for itw in itws:
-            for tran in self.trans:
-                output = tran.pass_input(cur_state, itw.action, cur_time + itw.time)
-                if output != "sink!":
-                    trace.append(output)
-                    cur_state = tran.target
-                    if tran.reset:
-                        cur_time = 0
-                    else:
-                        cur_time += itw.time
-                    break
-            if output == "sink!":
+            if not is_sink:
+                for tran in self.trans:
+                    output = tran.pass_input(cur_state, itw.action, cur_time + itw.time)
+                    if output is not None:
+                        trace.append(output)
+                        cur_state = tran.target
+                        if tran.reset:
+                            cur_time = 0
+                        else:
+                            cur_time += itw.time
+                        break
+                if output is None: # not complete
+                    trace.append("sink!")
+                    is_sink = True                
+            else:
                 trace.append("sink!")
-                self.query[itws] = (trace, -1)
-                return trace, -1
-
-        self.query[itws] = (trace, 1)
-        return trace, 1
+        assert None not in trace, "Bad"
+        if is_sink:
+            return tuple(trace), -1
+        else:
+            return tuple(trace), 1
     
     def runTimedWord(self, itws):
         """Execute the given timed word over inputs.
@@ -145,30 +146,34 @@ class OCMM:
         """
         if itws in self.query:
             return self.query[itws]
-        reset = 0
         output = None
-        if not itws:
-            return output, 1
         cur_state, cur_time = self.init_state, 0
-        for itw in itws:
+        print("before length of query:%d mq_num:%d length of tws: %d" % (len(self.query), self.mq_num, len(itws)))
+        for i, itw in enumerate(itws):
             for tran in self.trans:
                 output = tran.pass_input(cur_state, itw.action, cur_time + itw.time)
-                if output is not None:
-                    if tran.reset:
-                        reset += 1
+                if output is not None:      
                     cur_state = tran.target
                     if tran.reset:
                         cur_time = 0
                     else:
                         cur_time += itw.time
                     break
-            if output is None or output == "sink!":
-                return "sink!", -1
-        print("reset: %s input: %s" % (reset, len(itws)))
-        self.query[itws] = (output, 1)
-        self.steps += len(itws)
-        self.resets += reset
-        return output, 1
+            if output is None: # not complete transition
+                output = "sink!"
+            if itws[:i+1] not in self.query:
+                self.query[itws[:i+1]] = (output, (-1 if output == "sink!" else 1))
+            if output == "sink!": # always sink in the future
+                for j in range(i+1, len(itws)):
+                    self.query[itws[:j+1]] = self.query[itws[:i+1]]
+                break
+
+        self.mq_num += 1
+        print("After length of query:%d mq_num:%d" % (len(self.query), self.mq_num))
+        return self.query[itws]
+
+    def comp_input(self):
+        return sum([len(t) for t in self.query])
 
 def buildOCMM(jsonfile):
     """Build the teacher OTA from a json file."""

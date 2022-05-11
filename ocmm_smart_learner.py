@@ -898,7 +898,7 @@ def learn_ocmm(ota, limit=30, verbose=True, ctx=False):
 
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
-        ota_equiv = OCMMEquivalence(max_time, assist_ota, candidate, is_ocmm=True)
+        ota_equiv = OCMMEquivalence(max_time, assist_ota, candidate)
         res, ctx_path = ota_equiv.test_equivalent()
         eq_query_num += 1
         if not res and verbose:

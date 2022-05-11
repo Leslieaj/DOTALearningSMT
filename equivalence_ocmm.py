@@ -9,7 +9,7 @@ from decimal import Decimal
 import ota
 import interval
 from equivalence_simple import round_div_2, dec_zero, \
-    dec_half, dec_one
+    dec_half, dec_one, EQ, LESS, GREATER
 
 class Configuration:
     """A configuration consists of states for the left and right timed
@@ -49,16 +49,25 @@ class Configuration:
                 self.frac_A > self.frac_B and other.frac_A > other.frac_B)
 
     def __str__(self):
-        return "loc_A: %s region_A: %s loc_B: %s region_B: %s frac_A: %s frac_B: %s \n(pre: %s action: %s)" % (
+        return "loc_A: %s region_A: %s output_A: %s loc_B: %s region_B: %s output_B: %s frac_A: %s frac_B: %s \n(pre: %s action: %s)" % (
             self.loc_A, self.region_A, self.output_A, self.loc_B,
              self.region_B, self.output_B, self.frac_A, self.frac_B, self.pre, self.action)
 
     def __hash__(self):
-        return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
-            self.loc_B, self.region_B, self.output_B, self.frac_A, self.frac_B))
+        if self.frac_A < self.frac_B:
+            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
+                self.loc_B, self.region_B, self.output_B, LESS))
+        elif self.frac_A == self.frac_B:
+            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
+                self.loc_B, self.region_B, self.output_B, EQ))
+        elif self.frac_A > self.frac_B:
+            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
+                self.loc_B, self.region_B, self.output_B, GREATER))
+        else:
+            raise ValueError
 
 class OCMMEquivalence:
-    def __init__(self, max_value, ocmm_A, ocmm_B, is_ocmm=False):
+    def __init__(self, max_value, ocmm_A, ocmm_B):
         self.max_value = max_value
         self.ocmm_A = ocmm_A
         self.ocmm_B = ocmm_B
@@ -66,7 +75,7 @@ class OCMMEquivalence:
         assert ocmm_A.outputs == ocmm_B.outputs, "OCMMEquivalence: OCMMs must have the same outputs."
 
         self.init_config = Configuration(
-            self.ocmm_A.init_state, 0, None, self.ocmm_B.init_state, 0, None, dec_zero, dec_zero)
+            self.ocmm_A.init_state, 0, tuple(), self.ocmm_B.init_state, 0, tuple(), dec_zero, dec_zero)
 
         # Mapping from n to region
         self.region_dict = dict()

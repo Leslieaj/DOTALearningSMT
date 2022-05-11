@@ -215,6 +215,9 @@ class Learner:
         # Store the (tw1, tw2, reset) triple in which both tw1[:-1] == tw2[:-1] and tw1 == tw2
         self.constraint4_triple1 = []
 
+        # Store sink constraints
+        self.sink_constraint = set()
+
         self.addPath(())
 
         # Count the number of occurrence
@@ -613,7 +616,9 @@ class Learner:
         formulas = []
         for r, info in self.R.items():
             if info.is_sink:
-                formulas.append(self.reset_name[r] == True)
+                if r not in self.sink_constraint:
+                    self.sink_constraint.add(r)
+                    formulas.append(self.reset_name[r] == True)
 
         return formulas
 
@@ -685,9 +690,9 @@ class Learner:
         print("%d %d %d\n" % (self.constraint1_formula_num,
                     self.constraint2_formula_num, self.constraint4_formula_num))
         self.solver.push()
-        self.solver.add(*(constraint1 + constraint2 + constraint4))
+        self.solver.add(*(constraint1 + constraint2 + constraint4 + constraint5))
         self.solver.push()
-        self.solver.add(*(constraint5 + constraint6 + constraint7 + constraint8))
+        self.solver.add(*(constraint6 + constraint7 + constraint8))
         
         if str(self.solver.check()) == "unsat":
             # No assignment can be found for current S, extra_S, and state_num

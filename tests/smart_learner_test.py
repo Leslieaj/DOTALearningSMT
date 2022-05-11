@@ -4,10 +4,10 @@ sys.path.append("./")
 from ota import buildOTA, OTAToDOT
 from smart_learner import learn_ota, generate_pair, compute_max_time
 from equivalence import ota_equivalent
-from ota import TimedWord
 from pstats import Stats
 import cProfile
 import time
+from statistics import mean
 
 
 class SmartLearnerTest(unittest.TestCase):
@@ -29,6 +29,7 @@ class SmartLearnerTest(unittest.TestCase):
     def testLearnOTA(self):
         test_cases = [
             # "a.json", # 0.194
+            "a2.json",
             # "b.json", # 0.071
             # "c.json", # 0.190
             # "d.json", # 0.072
@@ -126,37 +127,37 @@ class SmartLearnerTest(unittest.TestCase):
             # "7_4_20/7_4_20-8.json", # 2.742
             # "7_4_20/7_4_20-9.json", # 4.694
             # "7_4_20/7_4_20-10.json", # 2.652
-            # "10_4_20/10_4_20-1.json", # 8.937
-            # "10_4_20/10_4_20-2.json", # 8.232
-            # "10_4_20/10_4_20-3.json", # 6.366
-            # "10_4_20/10_4_20-4.json", # 10.094
-            # "10_4_20/10_4_20-5.json", # 5.797
-            # "10_4_20/10_4_20-6.json", # 4.497
-            # "10_4_20/10_4_20-7.json", # 8.745
-            # "10_4_20/10_4_20-8.json", # 6.680
-            # "10_4_20/10_4_20-9.json", # 6.846
-            # "10_4_20/10_4_20-10.json", # 8.518
-            # "12_4_20/12_4_20-1.json", # 6.817
-            # "12_4_20/12_4_20-2.json", # 12.616
-            # "12_4_20/12_4_20-3.json", # 11.732
-            # "12_4_20/12_4_20-4.json", # 17.564
-            # "12_4_20/12_4_20-5.json", # 11.579
-            # "12_4_20/12_4_20-6.json", # 11.980
-            # "12_4_20/12_4_20-7.json", # 12.651
-            # "12_4_20/12_4_20-8.json", # 14.110
-            # "12_4_20/12_4_20-9.json", # 8.514
-            # "12_4_20/12_4_20-10.json", # 8.638
-            # "14_4_20/14_4_20-1.json", # 18.507
-            # "14_4_20/14_4_20-2.json", # 15.911
-            # "14_4_20/14_4_20-3.json", # 18.936
-            # "14_4_20/14_4_20-4.json", # 14.728
-            # "14_4_20/14_4_20-5.json", # 17.541
-            # "14_4_20/14_4_20-6.json", # 14.094
-            # "14_4_20/14_4_20-7.json", # 20.458
-            # "14_4_20/14_4_20-8.json", # 10.513
-            # "14_4_20/14_4_20-9.json", # 35.382
-            # "14_4_20/14_4_20-10.json", # 16.522
-
+            "10_4_20/10_4_20-1.json", # 8.937
+            "10_4_20/10_4_20-2.json", # 8.232
+            "10_4_20/10_4_20-3.json", # 6.366
+            "10_4_20/10_4_20-4.json", # 10.094
+            "10_4_20/10_4_20-5.json", # 5.797
+            "10_4_20/10_4_20-6.json", # 4.497
+            "10_4_20/10_4_20-7.json", # 8.745
+            "10_4_20/10_4_20-8.json", # 6.680
+            "10_4_20/10_4_20-9.json", # 6.846
+            "10_4_20/10_4_20-10.json", # 8.518
+            "12_4_20/12_4_20-1.json", # 6.817
+            "12_4_20/12_4_20-2.json", # 12.616
+            "12_4_20/12_4_20-3.json", # 11.732
+            "12_4_20/12_4_20-4.json", # 17.564
+            "12_4_20/12_4_20-5.json", # 11.579
+            "12_4_20/12_4_20-6.json", # 11.980
+            "12_4_20/12_4_20-7.json", # 12.651
+            "12_4_20/12_4_20-8.json", # 14.110
+            "12_4_20/12_4_20-9.json", # 8.514
+            "12_4_20/12_4_20-10.json", # 8.638
+            "14_4_20/14_4_20-1.json", # 18.507
+            "14_4_20/14_4_20-2.json", # 15.911
+            "14_4_20/14_4_20-3.json", # 18.936
+            "14_4_20/14_4_20-4.json", # 14.728
+            "14_4_20/14_4_20-5.json", # 17.541
+            "14_4_20/14_4_20-6.json", # 14.094
+            "14_4_20/14_4_20-7.json", # 20.458
+            "14_4_20/14_4_20-8.json", # 10.513
+            "14_4_20/14_4_20-9.json", # 35.382
+            "14_4_20/14_4_20-10.json", # 16.522
+# 
             # "MMT/OTAs/PC.json", # 10.470
         ]
 
@@ -167,26 +168,37 @@ class SmartLearnerTest(unittest.TestCase):
             pr = cProfile.Profile()
             pr.enable()
 
-        with open("output3.txt", "w") as output_file:
+        with open("output4.txt", "w") as output_file:
+            locs = 0
+            mems, eqs, timer = [], [], []
+            trans_num = 0
             for f in test_cases:
-                print("file name: %s", f)
+                print("file name: %s" % f)
                 o = buildOTA("./examples/%s" % f)
-                start_time = time.time()
+                trans_num += len(o.trans)
+                start_time = time.perf_counter()
                 learned_ota, mem_num, eq_num = learn_ota(o, limit=150, verbose=False)
-
+                end_time = time.perf_counter()
                 max_time = compute_max_time(o)
                 res, ctx = ota_equivalent(max_time, learned_ota, o)
-                assert res, ("missed ctx %s" % ctx)
-
-                end_time = time.time()
-                output_file.write("Test %s: %.3f (s) Membership query: %d Equivalence query: %d\n" 
-                            % (f, end_time - start_time, mem_num, eq_num))
+                assert res, ("missed counterexample %s" % ctx)
+                timer.append(end_time - start_time)
+                mems.append(mem_num)
+                eqs.append(eq_num)
+                loc = len(learned_ota.locations) - 1
+                locs += loc
+                output_file.write("Test %s: %.3f (s) Membership query: %d Equivalence query: %d Locations: %d\n" 
+                            % (f, end_time - start_time, mem_num, eq_num, loc))
                 output_file.flush()
                 if graph:
                     OTAToDOT(o, "ota_original")
-                    print("-------------------")
-                    OTAToDOT(learned_ota, "ota_learned", keep_sink_location=True)
-
+                    OTAToDOT(learned_ota, "ota_learned")
+            output_file.write("Avg trans: %f mem: %f eq: %f loc:%f time:%f\n" % (trans_num/10, mean(mems), mean(eqs), locs/10, mean(timer)))
+            output_file.write("MIN mem: %f eq: %f\n" % (min(mems), min(eqs)))
+            output_file.write("MAX mem: %f eq: %f\n" % (max(mems), max(eqs)))
+            output_file.write("\multirow{2}*{12\_4\_20} & \multirow{2}*{%s} & & \\textsf{OTAL} & %s & %s & %s & & %s & %s & %s & %s & &%.2f \\\\" % 
+            (trans_num, min(mems), mean(mems), max(mems), min(eqs), mean(eqs), max(eqs), locs, mean(timer)))
+        print(max_time)
         if profile:
             p = Stats(pr)
             p.strip_dirs()

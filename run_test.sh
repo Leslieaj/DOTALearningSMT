@@ -15,5 +15,9 @@ python stats.py $1 $1-$i.json
 done
 
 # Statistics
+<<<<<<< HEAD
 python -c "from stats import analyze; analyze(\""./result/$1.txt"\")" 
+=======
+python -c "import stats; stats.analyze(\""./result/$1.txt"\")" 
+>>>>>>> f0c3ac3c00576e17e6620c26c5d033b924255a4e
 
