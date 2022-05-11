@@ -2,7 +2,7 @@ from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA, OTAToJSON
 from ocmm import OCMMTran, OCMM, buildAssistantOCMM
 from interval import Interval
 from equivalence import ota_equivalent
-from equivalence_simple import OTAEquivalence
+from equivalence_ocmm import OCMMEquivalence
 import z3
 from os.path import commonprefix
 
@@ -119,12 +119,7 @@ class TestSequence:
         self.info = dict()
 
     def __str__(self):
-        
-        # for tws, val in sorted(self.info.items()):
-        #     res += '  %s: %s\n' % (','.join(str(tw) for tw in tws), val)
-        # return res
-        return "tws: %s\noutput: %s\nis_sink: %s" % \
-                (self.tws, self.output, self.is_sink)
+        return "output: %s\nis_sink: %s\n" % (self.output, self.is_sink)
 
     def __repr__(self):
         return str(self)
@@ -249,15 +244,18 @@ class Learner:
         self.addConstraint1(tws, res)
         self.addConstraint24(tws, res)
 
-    def addConstraint1(self, tws, res):
-        sequence = TestSequence(tws, res)
-
+    def addConstraint1(self, tws, _res):
+        sequence = TestSequence(tws, _res)
         # Compare the new row with each of the existing rows. For each
         # existing row that can be distinguished from the new row under some
         # resets, add the corresponding constraint1. Otherwise, record the
         # inability to distinguish to constraint1_triple.
         for row in self.R:
-            if not sequence.is_sink and not self.R[row].is_sink:
+            if self.R[row].is_sink:
+                continue
+            if tws and row and tws[-1] == row[-1] and _res[0] != self.R[row].output:
+                self.constraint1_formula.append(self.state_name[row] != self.state_name[tws])
+            elif not sequence.is_sink and not self.R[row].is_sink:
                 pairs = generate_pair(row, tws)
                 test_res = dict()
                 test_row = dict()
@@ -317,8 +315,6 @@ class Learner:
             # For each existing row whose last action equals the new row.
             if row != () and tws != () and row[-1].action == tws[-1].action:
                 pairs = generate_pair(row[:-1], tws[:-1])
-                # possible_resets = generate_row_resets_enhance(row, tws)
-                # for reset in possible_resets:
                 for i, j in pairs:
                     for b in range(4):
                         # reset = generate_row_resets_enhance1(row, tws, i, j, b)
@@ -446,11 +442,10 @@ class Learner:
                 "addToS: tws should be in R and not in S"
         self.S[tws] = self.R[tws]
 
-        if self.ota.runTimedWord(tws) != -1:
-            for act in self.actions:
-                cur_tws = tws + (TimedWord(act, 0),)
-                if cur_tws not in self.R:
-                    self.addPath(cur_tws)
+        for act in self.actions:
+            cur_tws = tws + (TimedWord(act, 0),)
+            if cur_tws not in self.R:
+                self.addPath(cur_tws)
 
     def addPossibleS(self, tws):
         """Check if tws can be added into S. If not, add
@@ -488,7 +483,7 @@ class Learner:
                 if is_new_state and cur_tws not in self.S and cur_res[1] != -1:
                     self.addToS(cur_tws)
 
-            if cur_res == -1:
+            if cur_res[1] == -1:
                 break
 
     def checkNewState(self, tws):
@@ -531,12 +526,19 @@ class Learner:
             else:
                 self.cache[(info1, info2)] = dict()
 
-        if info1.output != info2.output or info1.is_sink != info2.is_sink:
+        
+        if info1.is_sink != info2.is_sink: # accepting or sink
             return tuple()  # empty suffix is distinguishing
-
-
+        
         time1 = info1.getTimeVal(resets)
         time2 = info2.getTimeVal(resets)
+
+        # Different output from same input
+        if info1.tws and info2.tws and info1.tws[-1].action == info2.tws[-1].action and isSameRegion(time1, time2) and info1.output != info2.output:
+            return tuple()
+
+        if E is None and not self.E:
+            return None
 
         if E is None:
             suffix = self.E
@@ -793,8 +795,7 @@ class Learner:
             if tw == "sink":
                 location_objs.add(Location(loc, False, False, True))
             else:
-                location_objs.add(Location(loc, (loc=="1"), True, self.R[tw].is_sink))
-
+                location_objs.add(Location(loc, (loc=="1"), not self.R[tw].is_sink, self.R[tw].is_sink))
         candidateOTA = OCMM(
             name=self.ota.name + '_',
             inputs=self.actions,
@@ -816,7 +817,7 @@ def compute_max_time(candidate):
                     parse_time(tran.constraint.max_value))
     return max_time
 
-def learn_ota(ota, limit=30, verbose=True, ctx=False):
+def learn_ocmm(ota, limit=30, verbose=True, ctx=False):
     """Overall learning loop.
     
     limit - maximum number of steps.
@@ -829,10 +830,9 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
     max_time_ota = compute_max_time(ota)
     state_num = 1
     eq_query_num = 0
-
+    ota.outputs = assist_ota.outputs
     for step in range(1, limit):
         print("Step", step)
-
         # If size of S has increased beyond state_num, adjust state_num to
         # that size.
         if state_num < len(learner.S):
@@ -898,8 +898,7 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
 
         max_time_candidate = compute_max_time(candidate)
         max_time = max(max_time_ota, max_time_candidate)
-
-        ota_equiv = OTAEquivalence(max_time, assist_ota, candidate, is_ocmm=True)
+        ota_equiv = OCMMEquivalence(max_time, assist_ota, candidate)
         res, ctx_path = ota_equiv.test_equivalent()
         eq_query_num += 1
         if not res and verbose:
@@ -911,9 +910,7 @@ def learn_ota(ota, limit=30, verbose=True, ctx=False):
             # break
             return candidate, len(ota.query), eq_query_num
 
-        # ctx_path = tuple(ctx.find_path(assist_ota, candidate))
         if ctx:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)
-
     raise AssertionError

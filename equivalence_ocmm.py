@@ -8,29 +8,8 @@ from decimal import Decimal
 
 import ota
 import interval
-
-def round_div_2(r):
-    """r is of the form 0.xxxn. If n is even, return 0.xxx(n/2).
-    If n = 1, return 0.xxxx5. If n is odd greater than 1, return
-    0.xxx((n+1)/2).
-
-    """
-    if r == Decimal(1):
-        return Decimal('0.5')
-
-    s = '{:f}'.format(r)
-    num_digit = len(s) - 2
-    res = r * (Decimal(10) ** num_digit)
-    if res % 2 == 0 or res == 1:
-        return (res / Decimal(2)) / (Decimal(10) ** num_digit)
-    else:
-        return ((res + 1) / Decimal(2)) / (Decimal(10) ** num_digit)
-
-dec_zero = Decimal(0)
-dec_half = Decimal(0.5)
-dec_one = Decimal(1)
-
-LESS, EQ, GREATER = range(3)
+from equivalence_simple import round_div_2, dec_zero, \
+    dec_half, dec_one, EQ, LESS, GREATER
 
 class Configuration:
     """A configuration consists of states for the left and right timed
@@ -47,11 +26,13 @@ class Configuration:
     action - decimal number for delay, or string for name of an action.
 
     """
-    def __init__(self, loc_A, region_A, loc_B, region_B, frac_A, frac_B, *, pre=None, action=None):
+    def __init__(self, loc_A, region_A, output_A, loc_B, region_B, output_B, frac_A, frac_B, *, pre=None, action=None):
         self.loc_A = loc_A
         self.region_A = region_A
+        self.output_A = output_A
         self.loc_B = loc_B
         self.region_B = region_B
+        self.output_B = output_B
         self.frac_A = frac_A
         self.frac_B = frac_B
         
@@ -62,33 +43,39 @@ class Configuration:
     def __eq__(self, other):
         return self.loc_A == other.loc_A and self.region_A == other.region_A and \
                self.loc_B == other.loc_B and self.region_B == other.region_B and \
+               self.output_A == other.output_A and self.output_B == other.output_B and \
                (self.frac_A == other.frac_A and self.frac_B == other.frac_B or \
                 self.frac_A < self.frac_B and other.frac_A < other.frac_B or \
                 self.frac_A > self.frac_B and other.frac_A > other.frac_B)
 
     def __str__(self):
-        return "loc_A: %s region_A: %s loc_B: %s region_B: %s frac_A: %s frac_B: %s \n(pre: %s action: %s)" % (
-            self.loc_A, self.region_A, self.loc_B, self.region_B, self.frac_A, self.frac_B, self.pre, self.action)
+        return "loc_A: %s region_A: %s output_A: %s loc_B: %s region_B: %s output_B: %s frac_A: %s frac_B: %s \n(pre: %s action: %s)" % (
+            self.loc_A, self.region_A, self.output_A, self.loc_B,
+             self.region_B, self.output_B, self.frac_A, self.frac_B, self.pre, self.action)
 
     def __hash__(self):
         if self.frac_A < self.frac_B:
-            return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, LESS))
+            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
+                self.loc_B, self.region_B, self.output_B, LESS))
         elif self.frac_A == self.frac_B:
-            return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, EQ))
+            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
+                self.loc_B, self.region_B, self.output_B, EQ))
         elif self.frac_A > self.frac_B:
-            return hash(("CONFIG", self.loc_A, self.region_A, self.loc_B, self.region_B, GREATER))
+            return hash(("CONFIG", self.loc_A, self.region_A, self.output_A, 
+                self.loc_B, self.region_B, self.output_B, GREATER))
         else:
             raise ValueError
 
-class OTAEquivalence:
-    def __init__(self, max_value, ota_A, ota_B, is_ocmm=False):
+class OCMMEquivalence:
+    def __init__(self, max_value, ocmm_A, ocmm_B):
         self.max_value = max_value
-        self.ota_A = ota_A
-        self.ota_B = ota_B
-        assert ota_A.sigma == ota_B.sigma, "OTAEquivalence: OTAs must have the same actions."
+        self.ocmm_A = ocmm_A
+        self.ocmm_B = ocmm_B
+        assert ocmm_A.sigma == ocmm_B.sigma, "OCMMEquivalence: OTAs must have the same actions."
+        assert ocmm_A.outputs == ocmm_B.outputs, "OCMMEquivalence: OCMMs must have the same outputs."
 
         self.init_config = Configuration(
-            self.ota_A.init_state, 0, self.ota_B.init_state, 0, dec_zero, dec_zero)
+            self.ocmm_A.init_state, 0, tuple(), self.ocmm_B.init_state, 0, tuple(), dec_zero, dec_zero)
 
         # Mapping from n to region
         self.region_dict = dict()
@@ -121,38 +108,48 @@ class OTAEquivalence:
         """
         if self.is_inf(c.region_A):
             if self.is_point(c.region_B):
-                return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, dec_zero, dec_half), dec_half
+                return Configuration(c.loc_A, c.region_A, c.output_A, 
+                        c.loc_B, c.region_B+1, c.output_B, dec_zero, dec_half), dec_half
             else:
-                return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, dec_zero, dec_zero), 1 - c.frac_B
+                return Configuration(c.loc_A, c.region_A, c.output_A, 
+                    c.loc_B, c.region_B+1, c.output_B, dec_zero, dec_zero), 1 - c.frac_B
         elif self.is_inf(c.region_B):
             if self.is_point(c.region_A):
-                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, dec_half, dec_zero), dec_half
+                return Configuration(c.loc_A, c.region_A+1, c.output_A, 
+                    c.loc_B, c.region_B, c.output_B, dec_half, dec_zero), dec_half
             else:
-                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, dec_zero, dec_zero), 1 - c.frac_A
+                return Configuration(c.loc_A, c.region_A+1, c.output_A, 
+                    c.loc_B, c.region_B, c.output_B, dec_zero, dec_zero), 1 - c.frac_A
         elif self.is_point(c.region_A) and self.is_point(c.region_B):
-            return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B+1, dec_half, dec_half), dec_half
+            return Configuration(c.loc_A, c.region_A+1, c.output_A, 
+                c.loc_B, c.region_B+1, c.output_B, dec_half, dec_half), dec_half
         elif self.is_point(c.region_A) and self.is_frac(c.region_B):
             inc = round_div_2(dec_one - c.frac_B)
-            return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, inc, c.frac_B + inc), inc
+            return Configuration(c.loc_A, c.region_A+1, c.output_A, 
+                c.loc_B, c.region_B, c.output_B, inc, c.frac_B + inc), inc
         elif self.is_frac(c.region_A) and self.is_point(c.region_B):
             inc = round_div_2(dec_one - c.frac_A)
-            return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, c.frac_A + inc, inc), inc
+            return Configuration(c.loc_A, c.region_A, c.output_A, 
+                c.loc_B, c.region_B+1, c.output_B, c.frac_A + inc, inc), inc
         elif self.is_frac(c.region_A) and self.is_frac(c.region_B):
             if c.frac_A == c.frac_B:
-                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B+1, dec_zero, dec_zero), 1 - c.frac_A
+                return Configuration(c.loc_A, c.region_A+1, c.output_A, 
+                    c.loc_B, c.region_B+1, c.output_B, dec_zero, dec_zero), 1 - c.frac_A
             elif c.frac_A < c.frac_B:
                 inc = dec_one - c.frac_B
-                return Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B+1, c.frac_A + inc, dec_zero), inc
+                return Configuration(c.loc_A, c.region_A, c.output_A, 
+                    c.loc_B, c.region_B+1, c.output_B, c.frac_A + inc, dec_zero), inc
             else:  # c.frac_A > c.frac_B
                 inc = dec_one - c.frac_A
-                return Configuration(c.loc_A, c.region_A+1, c.loc_B, c.region_B, dec_zero, c.frac_B + inc), inc
+                return Configuration(c.loc_A, c.region_A+1, c.output_A, 
+                    c.loc_B, c.region_B, c.output_B, dec_zero, c.frac_B + inc), inc
         else:
             raise AssertionError
 
     def delay_seq(self, c):
         """Obtain the sequence of delays from given configuration."""
-        results = [Configuration(c.loc_A, c.region_A, c.loc_B, c.region_B, c.frac_A, c.frac_B,
-                                 pre=c, action=dec_zero)]
+        results = [Configuration(c.loc_A, c.region_A, c.output_A, 
+                    c.loc_B, c.region_B, c.output_B, c.frac_A, c.frac_B, pre=c, action=dec_zero)]
         inc_total = dec_zero
         cur_config = c
         while not (self.is_inf(cur_config.region_A) and self.is_inf(cur_config.region_B)):
@@ -168,9 +165,7 @@ class OTAEquivalence:
         but B side is not accepting, or vice versa.
         
         """
-        A_accept = c.loc_A in self.ota_A.accept_states
-        B_accept = c.loc_B in self.ota_B.accept_states
-        return A_accept != B_accept
+        return c.output_A != c.output_B
     
     def immediate_asucc(self, c, action):
         """Perform an immediate action, without further time delays."""
@@ -178,27 +173,30 @@ class OTAEquivalence:
         A_reg = self.int_to_region(c.region_A)
         B_reg = self.int_to_region(c.region_B)
 
-        for tran in self.ota_A.trans_dict[(action, c.loc_A)]:
+        for tran in self.ocmm_A.trans_dict[(action, c.loc_A)]:
             if tran.constraint.contains_interval(A_reg):
                 A_tran = tran
-        for tran in self.ota_B.trans_dict[(action, c.loc_B)]:
+                break
+        for tran in self.ocmm_B.trans_dict[(action, c.loc_B)]:
             if tran.constraint.contains_interval(B_reg):
                 B_tran = tran
+                break
         assert A_tran is not None and B_tran is not None
 
         new_region_A = 0 if A_tran.reset else c.region_A
         new_frac_A = dec_zero if A_tran.reset else c.frac_A
         new_region_B = 0 if B_tran.reset else c.region_B
         new_frac_B = dec_zero if B_tran.reset else c.frac_B
-        return Configuration(A_tran.target, new_region_A, B_tran.target, new_region_B, new_frac_A, new_frac_B,
-                             pre=c, action=action)
+        return Configuration(A_tran.target, new_region_A, A_tran.output, 
+                B_tran.target, new_region_B, B_tran.output, 
+                    new_frac_A, new_frac_B, pre=c, action=action)
 
     def compute_wsucc(self, c):
         """Compute the list of all successors of c."""
         delay_seq = self.delay_seq(c)
         results = []
         for delay in delay_seq:
-            for action in self.ota_A.sigma:
+            for action in self.ocmm_A.sigma:
                 imm_asucc = self.immediate_asucc(delay, action)
                 if imm_asucc not in results:
                     results.append(imm_asucc)
