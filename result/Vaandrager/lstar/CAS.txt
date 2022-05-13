@@ -1,0 +1,70 @@
+-------------- ExampleMM1TLearner's Profile --------------------
+learning rounds [#]: 1
+Learning [ms]: 8484, (8.484 s)
+Searching for counterexample [ms]: 71015, (71.015 s)
+
+Membership Queries to SUL [queries]: 245
+Conformance Queries to SUL [queries]: 1000
+-------------------------------------------------------
+
+==========================================
+ ExampleMM1TLearner: CAS
+ Learning Algorithm: lstar
+ Testing Algorithm: RandomWord
+------------------------------------------
+         Hypothesis Learning              
+------------------------------------------
+ Membership Queries: 245
+  - Tree Queries: 169
+  - SUL Queries: 76
+  - Delay Queries: 0
+------------------------------------------
+         Conformance Testing              
+------------------------------------------
+ Membership Queries: 1000
+  - Tree Queries: 866
+  - SUL Queries: 134
+  - Delay Queries: 0
+==========================================
+ Equivalence Queries: 1
+ SUL Resets: 494
+ SUL Inputs: 2528
+==========================================
+
+Learned the following MM1T of (8) states using (5) inputs.
+digraph g {
+
+	s0 [shape="circle" label="0"];
+	s1 [shape="circle" label="1"];
+	s2 [shape="circle" label="2"];
+	s3 [shape="circle" label="3"];
+	s4 [shape="circle" label="4"];
+	s5 [shape="circle" label="5"];
+	s6 [shape="circle" label="6"];
+	s7 [shape="circle" label="7"];
+	s0 -> s1 [label="lock"];
+	s0 -> s2 [label="close"];
+	s1 -> s3 [label="close
+set-timer(2ms)"];
+	s1 -> s0 [label="unlock"];
+	s2 -> s3 [label="lock
+set-timer(2ms)"];
+	s2 -> s0 [label="open"];
+	s3 -> s2 [label="unlock"];
+	s3 -> s1 [label="open"];
+	s3 -> s4 [label="timeout / armedOn"];
+	s4 -> s2 [label="unlock / armedOff"];
+	s4 -> s5 [label="open / armedOff+flashOn+SoundOn
+set-timer(3ms)"];
+	s5 -> s0 [label="unlock / soundOff+flashOff"];
+	s5 -> s6 [label="timeout / soundOff
+set-timer(27ms)"];
+	s6 -> s0 [label="unlock / flashOff"];
+	s6 -> s7 [label="timeout / flashOff"];
+	s7 -> s4 [label="close / armedOn"];
+	s7 -> s0 [label="unlock"];
+
+__start0 [label="" shape="none" width="0" height="0"];
+__start0 -> s0;
+
+}
