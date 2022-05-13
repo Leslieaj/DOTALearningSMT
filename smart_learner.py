@@ -127,7 +127,7 @@ class TestSequence:
         else:
             res = "Non-accept\n"
         for tws, val in sorted(self.info.items()):
-            res += '  %s: %s\n' % (','.join(str(tw) for tw in tws), val)
+            res += '  %s: %.1f\n' % (','.join(str(tw) for tw in tws), val)
         return res
 
     def __repr__(self):
@@ -235,6 +235,9 @@ class Learner:
             res += str(twR) + ': ' + str(info)
         res += 'S:\n'
         for twS, info in sorted(self.S.items()):
+            res += str(twS) + ': ' + str(info)
+        res += 'S+:\n'
+        for twS, info in sorted(self.extra_S.items()):
             res += str(twS) + ': ' + str(info)
         res += 'E:\n'
         res += '\n'.join(','.join(str(tw) for tw in twE) for twE in self.E)

@@ -53,7 +53,7 @@ class TimedWord:
         return hash(('TIMEDWORD', self.action, self.time))
 
     def __str__(self):
-        return '(%s,%s)' % (self.action, str(self.time))
+        return '(%s,%.1f)' % (self.action, self.time)
 
     def __repr__(self):
         return str(self)
