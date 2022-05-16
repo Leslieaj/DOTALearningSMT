@@ -1,4 +1,4 @@
-# DOTALearningLearning
+# DOTALearningSMT
 Active learning of deterministic one-clock timed automata using constraint solving.
 
 
