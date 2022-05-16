@@ -229,6 +229,9 @@ class Learner:
         # Incremental solver
         self.solver = z3.Solver()
 
+        # Record the full constraint1
+        self.full_constraint1 = []
+
     def __str__(self):
         res = 'R:\n'
         for twR, info in sorted(self.R.items()):
@@ -242,6 +245,12 @@ class Learner:
         res += 'E:\n'
         res += '\n'.join(','.join(str(tw) for tw in twE) for twE in self.E)
         return res
+
+    def find_row(self, row_name):
+        """Find the row whose state is encoded as row_name"""
+        for r in self.state_name:
+            if self.state_name[r] == row_name:
+                return r
 
     def addRow(self, tws, res):
         """When adding a new row, complete the corresponding information.
@@ -658,6 +667,7 @@ class Learner:
 
     def clearConstraint(self):
         self.constraint1_formula_num += len(self.constraint1_formula)
+        self.full_constraint1 += self.constraint1_formula
         self.constraint1_formula  = []
         self.constraint2_formula_num += len(self.constraint2_formula)
         self.constraint2_formula  = []
@@ -665,6 +675,27 @@ class Learner:
             len(self.constraint4_formula1) + len(self.constraint4_formula2)
         self.constraint4_formula1 = []
         self.constraint4_formula2 = []
+
+    def display_formula(self):
+        print("display formula")
+        d = dict()
+        for f in self.full_constraint1:
+            if z3.is_implies(f):
+                imp = f.arg(1)
+                reset_encoding = f.arg(0)
+                r1, r2 = imp.children()
+                if (r1, r2) not in d:
+                    d[(r1, r2)] = [reset_encoding]
+                else:
+                    d[(r1, r2)].append(reset_encoding)
+            else:
+                r1, r2 = f.children()
+                d[(r1, r2)] = [False]
+        for r1, r2 in d:
+            print("row_1", r1, self.find_row(r1))
+            print("row_2", r2, self.find_row(r2))
+            print(z3.Or(*d[(r1, r2)]))
+            print()
         
 
     def findReset(self, state_num, enforce_extra):
