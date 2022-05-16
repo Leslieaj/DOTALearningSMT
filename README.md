@@ -1,5 +1,5 @@
-# NOTALearning
-Learning nondeterministic one-clock timed automata
+# DOTALearningLearning
+Active learning of deterministic one-clock timed automata using constraint solving.
 
 
 ## Software Requirements
