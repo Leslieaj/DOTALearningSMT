@@ -21,7 +21,7 @@ class OCMMLearner(unittest.TestCase):
         if profile:
             pr = cProfile.Profile()
             pr.enable()
-        with open("mm1t_output.txt", "w") as output_file:
+        with open("ocmm_output.txt", "w") as output_file:
             for f in test_cases:
                 print("file name %s" % f)
                 o = ocmm.buildOCMM("./examples/MMT/OCMMs/%s.json" % f)

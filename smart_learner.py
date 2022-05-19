@@ -1,5 +1,5 @@
 import pprint
-from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA, OTAToJSON
+from ota import Location, TimedWord, OTA, OTATran, buildAssistantOTA, OTAToJSON, OTAToDOT
 from interval import Interval
 from equivalence import ota_equivalent
 from equivalence_simple import OTAEquivalence
@@ -862,10 +862,9 @@ def compute_max_time(candidate):
                     parse_time(tran.constraint.max_value))
     return max_time
 
-def learn_ota(ota, limit=30, verbose=True):
+def learn_ota(ota, verbose=True, graph=False):
     """Overall learning loop.
     
-    limit - maximum number of steps.
     verbose - whether to print debug information.
 
     """
@@ -948,6 +947,7 @@ def learn_ota(ota, limit=30, verbose=True):
 
         ota_equiv = OTAEquivalence(max_time, assist_ota, candidate)
         res, ctx_path = ota_equiv.test_equivalent()
+
         # res, ctx = ota_equivalent(max_time, assist_ota, candidate)
         eq_query_num += 1
         if not res and verbose:
@@ -955,11 +955,9 @@ def learn_ota(ota, limit=30, verbose=True):
         if res:
             print(candidate)
             print("Finished in %s steps " % step)
-            # OTAToJSON(candidate, "candidate")
-            # break
             return candidate, len(ota.query), eq_query_num
-
-        # ctx_path = tuple(ctx.find_path(assist_ota, candidate))
+        if graph:
+            OTAToDOT(candidate, "Step %d" % step)
         if verbose:
             print("Counterexample", ctx_path, ota.runTimedWord(ctx_path), candidate.runTimedWord(ctx_path))
         learner.addPath(ctx_path)

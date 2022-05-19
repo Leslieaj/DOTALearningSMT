@@ -1,10 +1,12 @@
 """Collect and analysis experimental data."""
 
-import sys,time
+import sys
+import time
+from statistics import mean
+
 from ota import buildOTA
 from ocmm import buildOCMM
 from smart_learner import learn_ota
-from statistics import mean
 
 from ocmm_smart_learner import learn_ocmm
 
@@ -18,13 +20,14 @@ def smt_learn_dota(folder_name, file_name):
         o = buildOTA("./examples/DOTA/%s/%s" % (folder_name, file_name))
         trans_num += len(o.trans)
         start_time = time.perf_counter()
-        learned_ota, mem_num, eq_num = learn_ota(o, limit=150, verbose=False)
+        learned_ota, mem_num, eq_num = learn_ota(o, verbose=False)
         end_time = time.perf_counter()
+        trans_num = len(o.trans)
         mems.append(mem_num)
         eqs.append(eq_num)
         loc = len(learned_ota.locations) - 1
         locs += loc
-        output_file.write("Test %s: %s, Membership query: %d, Equivalence query: %d, Locations: %d, Transitions: %d \n" 
+        output_file.write("File name: %s, Time: %.3f, Membership query: %d, Equivalence query: %d, Locations: %d, Transitions: %d \n" 
                     % (file_name, end_time - start_time, mem_num, eq_num, loc, trans_num))
         output_file.flush()
 
@@ -53,7 +56,7 @@ def parse_data(file_name):
     lines = open(file_name, "r").read().splitlines()
     test_data = []
     for line in lines:
-        test_data.append([float(b.split(":")[1]) for b in line.split(",")])
+        test_data.append([float(b.split(":")[1]) for b in line.split(",")[1:]])
     # time_data, mem_data, eq_data, locs, trans = list(zip(*test_data))
     return list(zip(*test_data))
 
